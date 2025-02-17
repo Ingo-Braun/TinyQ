@@ -1,0 +1,1 @@
+python3 ./test_runner/runTest.py '$@'
