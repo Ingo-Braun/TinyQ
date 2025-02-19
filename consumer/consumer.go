@@ -7,13 +7,12 @@ import (
 
 	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
 	Route "github.com/Ingo-Braun/TinyQ/structs/route"
+	"github.com/google/uuid"
 )
 
 type Consumer struct {
 	route *Route.Route
-	// inputChannel chan Messages.RouterMessage
-	// ctx          context.Context
-	// Cancel       context.CancelFunc
+	id    string
 }
 
 func (c *Consumer) GetMessage() (*Messages.RouterMessage, bool) {
@@ -25,17 +24,26 @@ func (c *Consumer) GetMessage() (*Messages.RouterMessage, bool) {
 			log.Println("consumer get message timed out")
 			return nil, false
 		default:
-			routerMessage, ok := c.route.GetMessage()
+			routerMessage, ok := c.route.GetMessage(c.GetId())
 			return routerMessage, ok
 		}
 	}
 
 }
 
+func (c *Consumer) GetId() string {
+	return c.id
+}
+
 func (c *Consumer) Setup(route *Route.Route) {
 	c.route = route
+	c.id = uuid.New().String()
 }
 
 func (c *Consumer) Size() int {
 	return c.route.Size()
+}
+
+func (c *Consumer) Ack(message *Messages.RouterMessage) bool {
+	return c.route.Ack(c.GetId(), message.GetId())
 }

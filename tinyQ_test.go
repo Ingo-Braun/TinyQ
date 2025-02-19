@@ -133,12 +133,10 @@ func TestSendAndReceive(t *testing.T) {
 	t.Logf("queue size %v", route.Size())
 
 	message, ok := receiveMessage(consumer)
-	message.Ack()
 	if ok && string(message.Content) != messageText {
 		t.Errorf("failed receiving message sent %v received %v", messageText, string(message.Content))
 		t.Fail()
 	}
-
 }
 
 func TestAck(t *testing.T) {
@@ -157,7 +155,7 @@ func TestAck(t *testing.T) {
 		t.Logf("is message expired %v", message.IsExpired())
 		t.Logf("is message valide %v", message.IsValid())
 		if message.IsExpired() == false && message.IsValid() {
-			err := message.Ack()
+			err := consumer.Ack(message)
 			if !err {
 				t.Fail()
 			}
@@ -215,12 +213,62 @@ func TestReAquireMessage(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	message, ok = receiveMessage(consumer)
 	if ok {
-		message.Ack()
+		consumer.Ack(message)
 		if message.GetId() != id {
 			t.Errorf("message id mismatch expected %v got %v", id, message.GetId())
 			t.Fail()
 		}
 	}
+}
+
+func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
+	t.Log("starting router")
+	router := startRouter()
+	t.Cleanup(router.StopRouter)
+	router.RegisterRoute("test")
+	publisher := router.GetPublisher()
+	consumer1 := router.GetConsumer("test")
+	consumer2 := router.GetConsumer("test")
+	route, ok := router.GetRoute("test")
+	if !ok {
+		t.Error("failed getting route")
+		t.Fail()
+	}
+	publisher.Publish([]byte("test message"), "test")
+	message, ok := receiveMessage(consumer1)
+	originalMessageId := message.GetId()
+	if !ok {
+		t.Error("failed getting message")
+		t.Fail()
+	}
+	routeConsumerId, ok := route.GetConsummerId(message)
+	if !ok {
+		t.Error("failed getting router consumer id for message")
+		t.Fail()
+	}
+	if routeConsumerId != consumer1.GetId() {
+		t.Errorf("route consumer id mismatch expected %v got %v", consumer1.GetId(), routeConsumerId)
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * (messages.DeliveryTimeout + 100))
+	if !message.IsExpired() {
+		t.Error("message is not expired")
+		t.Fail()
+	}
+	var message2 *messages.RouterMessage
+	message2, ok = receiveMessage(consumer2)
+	if !ok {
+		t.Fail()
+	}
+	if message2.GetId() != originalMessageId {
+		t.Errorf("message id mismatch expected %v got %v", originalMessageId, message2.GetId())
+	}
+	routeConsumerId2, _ := route.GetConsummerId(message2)
+	if routeConsumerId2 != consumer2.GetId() {
+		t.Errorf("route consumer id mismatch expected %v got %v", consumer2.GetId(), routeConsumerId2)
+		t.Fail()
+	}
+
 }
 
 func TestCreateMultiplePublishers(t *testing.T) {
@@ -318,6 +366,7 @@ waitLoop:
 		t.Error("failed getting route")
 		t.Fail()
 	}
+	time.Sleep(time.Millisecond * 100)
 	if route.Size() != 30 {
 		t.Errorf("route have %v messages expected %v", route.Size(), 30)
 		t.Fail()
@@ -373,9 +422,8 @@ func TestMultiReceive(t *testing.T) {
 				default:
 					message, ok := receiveMessage(consumer)
 					if ok {
-						message.Ack()
+						consumer.Ack(message)
 						returnChan <- message.Content
-						message.Ack()
 					}
 				}
 			}
