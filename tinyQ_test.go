@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"log"
 	"testing"
 	"time"
 
@@ -119,6 +121,7 @@ func TestCreateBasicConssumerNotRegisteredRoute(t *testing.T) {
 }
 
 // Test sending an message
+// fails if there is an failure in delivering the message
 // fails if the route size is 0
 // the reading of the Route size is realiable due to not having an consummer attatched to it
 func TestSend(t *testing.T) {
@@ -135,7 +138,12 @@ func TestSend(t *testing.T) {
 
 	// creates the test message and publishes
 	const messageText string = "this is a test"
-	publisher.Publish([]byte(messageText), "test")
+	_, ok := publisher.Publish([]byte(messageText), "test")
+
+	if !ok {
+		t.Error("failed deliveing message to Router")
+		t.FailNow()
+	}
 
 	// get the Route struct
 	route, ok := router.GetRoute("test")
@@ -611,7 +619,6 @@ waitLoop:
 }
 
 // Test multiple go routines consumers
-// Test getting an message that has expired by other consumer
 // fails if there is an failure in delivering the messages
 // fails if test route dont have 20 messages before the retrival process
 // fails if retreived messages channel dont have 20 messages
@@ -715,6 +722,75 @@ func TestMultiReceive(t *testing.T) {
 	}
 	if num != 210 {
 		t.Errorf("test failed sum of messages is %v expected %v", num, 210)
+		t.FailNow()
+	}
+}
+
+// Test subscriber calling an call back function
+// fails if there is an failure in delivering the messages
+// fails if subscriber is not running
+// fails if subscriber dont call the callback function in 10 seconds
+// fails if the callback function is not executed
+// fails if the id of the message received by the callback function dosent match original message id
+func TestSubscriber(t *testing.T) {
+	// setup
+	t.Log("starting router")
+	router := startRouter()
+	t.Cleanup(router.StopRouter)
+
+	// register the test route
+	router.RegisterRoute("test")
+
+	// create an new publisher
+	publisher := router.GetPublisher()
+
+	// creates the test message and publishes
+	const messageText string = "this is a test"
+	messageId, ok := publisher.Publish([]byte(messageText), "test")
+
+	if !ok {
+		t.Error("failed deliveing message to Router")
+		t.FailNow()
+	}
+	// timer to call callback function
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	// cancel if message received in callback function dosent match original message
+	failCtx, failCancel := context.WithCancel(context.Background())
+
+	// using channel to bypass scope and allow response from callback function
+	messageIdChan := make(chan string, 1)
+	messageIdChan <- messageId
+
+	// callback function in compliance to subscriber.CallBack (*messages.RouterMessage,contextCancelFunc)
+	testCallback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+		id := <-messageIdChan
+		log.Printf("want %v got %v", id, message.GetId())
+		log.Print(id != message.GetId())
+		if id != message.GetId() {
+			log.Printf("message id expected %v \n", messageId)
+			failCancel()
+		}
+		cancel()
+		ack()
+	}
+	t.Log("creating subscriber")
+	subscriber, ok := router.GetSubscriber("test", testCallback)
+
+	if !ok {
+		t.Error("failed creating subscriber")
+		t.FailNow()
+	}
+
+	if subscriber.IsRunning() == false {
+		t.Error("subscriber is not running")
+		t.FailNow()
+	}
+
+	<-ctx.Done()
+
+	if errors.Is(failCtx.Err(), context.Canceled) == true {
+		t.Error("message id mismatch")
 		t.FailNow()
 	}
 }

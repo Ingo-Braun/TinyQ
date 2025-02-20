@@ -9,7 +9,7 @@ import (
 )
 
 // Milliseconds (ms) until message expires if not ack
-const DeliveryTimeout = 200
+const DeliveryTimeout = 20000
 
 type RouterMessage struct {
 	// Message UUID

@@ -12,6 +12,7 @@ import (
 	"github.com/Ingo-Braun/TinyQ/publishers/simple"
 	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
 	Route "github.com/Ingo-Braun/TinyQ/structs/route"
+	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
 // N times witch the router wil try to deliver
@@ -181,4 +182,17 @@ func (router *Router) HasRoute(routeKey string) bool {
 // Checks if the router is running
 func (router *Router) IsRunning() bool {
 	return !errors.Is(router.stopCTX.Err(), context.Canceled)
+}
+
+func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBack) (*Subscriber.Subscriber, bool) {
+	if router.HasRoute(routeKey) {
+		subscriber := Subscriber.Subscriber{}
+		route, ok := router.GetRoute(routeKey)
+		if !ok {
+			return nil, false
+		}
+		subscriber.Setup(route, callBack)
+		return &subscriber, true
+	}
+	return nil, false
 }
