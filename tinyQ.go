@@ -24,10 +24,15 @@ const maxChanSize int = 30
 // call InitRouter to initialize the router
 // call StopRouter to stop the routing process WARNING this kills all routes and deletes all messages on the routes
 type Router struct {
-	Routes        map[string]*Route.Route
-	routesMutex   sync.Mutex
-	RouterInput   chan *Messages.RouterMessage
+	// Routing map used to store all known routes [routeKey]*Route
+	Routes map[string]*Route.Route
+	// Routing map mutex
+	routesMutex sync.Mutex
+	// Router input channel - where the messages come
+	RouterInput chan *Messages.RouterMessage
+	// Router re-send channel not used
 	ResendChannel chan *Messages.RouterMessage
+	// Router stop context
 	stopCTX       context.Context
 	stopCTXCancel context.CancelFunc
 }
@@ -41,7 +46,8 @@ writeLoop:
 		select {
 		case <-ctx.Done():
 			routerMessage.RetrySend++
-			router.ResendChannel <- routerMessage
+			// router.ResendChannel <- routerMessage
+			router.RouterInput <- routerMessage
 			break writeLoop
 		default:
 
@@ -157,7 +163,7 @@ func (router *Router) GetRoute(routeKey string) (*Route.Route, bool) {
 // Use as many as you need
 func (router *Router) GetPublisher() *simple.SimplePublisher {
 	publisher := simple.SimplePublisher{}
-	publisher.StartPublisher(router.GetInputChannel())
+	publisher.StartPublisher(router.GetInputChannel(), router.stopCTX)
 	return &publisher
 }
 
