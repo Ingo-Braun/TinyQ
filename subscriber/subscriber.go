@@ -7,8 +7,8 @@ import (
 
 	"errors"
 
-	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
-	Route "github.com/Ingo-Braun/TinyQ/structs/route"
+	Messages "github.com/Ingo-Braun/TinyQ/messages"
+	Route "github.com/Ingo-Braun/TinyQ/route"
 	"github.com/google/uuid"
 )
 
@@ -65,4 +65,8 @@ func (s *Subscriber) Consumer() {
 
 func (s *Subscriber) IsRunning() bool {
 	return !errors.Is(s.closeCTX.Err(), context.Canceled)
+}
+
+func (s *Subscriber) Join() {
+	<-s.closeCTX.Done()
 }

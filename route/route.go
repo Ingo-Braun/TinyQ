@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
+	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
 // default maximum of messages in an Route

@@ -3,7 +3,7 @@ package simple
 import (
 	"context"
 
-	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
+	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
 type SimplePublisher struct {

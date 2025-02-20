@@ -11,7 +11,7 @@ import (
 
 	tinyQ "github.com/Ingo-Braun/TinyQ"
 	"github.com/Ingo-Braun/TinyQ/consumer"
-	"github.com/Ingo-Braun/TinyQ/structs/messages"
+	"github.com/Ingo-Braun/TinyQ/messages"
 )
 
 // starts a new router

@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
-	Route "github.com/Ingo-Braun/TinyQ/structs/route"
+	Messages "github.com/Ingo-Braun/TinyQ/messages"
+	Route "github.com/Ingo-Braun/TinyQ/route"
 	"github.com/google/uuid"
 )
 

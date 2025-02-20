@@ -9,9 +9,9 @@ import (
 	"errors"
 
 	"github.com/Ingo-Braun/TinyQ/consumer"
+	Messages "github.com/Ingo-Braun/TinyQ/messages"
 	"github.com/Ingo-Braun/TinyQ/publishers/simple"
-	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
-	Route "github.com/Ingo-Braun/TinyQ/structs/route"
+	Route "github.com/Ingo-Braun/TinyQ/route"
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
