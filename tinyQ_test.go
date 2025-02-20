@@ -54,8 +54,8 @@ func TestCreateRoute(t *testing.T) {
 	router := startRouter()
 	t.Cleanup(router.StopRouter)
 	t.Log("creating route test")
-	channel := router.RegisterRoute("test")
-	if channel == nil {
+	router.RegisterRoute("test")
+	if !router.HasRoute("test") {
 		t.Error("failed to create route")
 	}
 }
