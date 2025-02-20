@@ -24,6 +24,19 @@ type Route struct {
 	mutex             sync.Mutex
 	WaitRoutineCTX    context.Context
 	WaitRoutineCancel context.CancelFunc
+	CloseCTX          context.Context
+	CloseCancel       context.CancelFunc
+	RouterCloseCTX    context.Context
+}
+
+func (r *Route) checkIfRouterIsClosed() {
+	select {
+	case <-r.RouterCloseCTX.Done():
+		r.CloseCancel()
+		r.WaitRoutineCancel()
+	default:
+		return
+	}
 }
 
 func (r *Route) GetMessage(consumerId string) (*Messages.RouterMessage, bool) {
@@ -60,6 +73,7 @@ func (r *Route) GetMessage(consumerId string) (*Messages.RouterMessage, bool) {
 }
 
 func (r *Route) Size() int {
+	r.checkIfRouterIsClosed()
 	return len(r.Channel) + len(r.reDeliveryChannel)
 }
 
@@ -69,8 +83,8 @@ func (r *Route) watchTimedOutMessages() {
 		case <-r.WaitRoutineCTX.Done():
 			return
 		default:
+			r.checkIfRouterIsClosed()
 			r.mutex.Lock()
-
 			for key := range maps.Keys(r.waitingMessages) {
 				messageStorage, ok := r.waitingMessages[key]
 				if ok && messageStorage.Message.IsExpired() {
@@ -106,14 +120,22 @@ func (r *Route) GetConsummerId(message *Messages.RouterMessage) (string, bool) {
 	return "", false
 }
 
-func SetupRoute() (*Route, chan *Messages.RouterMessage) {
+func SetupRoute(routerCloseCTX context.Context) (*Route, chan *Messages.RouterMessage) {
 	outputChannel := make(chan *Messages.RouterMessage, defaultMaxChanSize)
+	CloseCTX, closeCancel := context.WithCancel(context.Background())
 	route := Route{
 		Channel:           outputChannel,
 		reDeliveryChannel: make(chan *Messages.RouterMessage, defaultMaxChanSize),
 		waitingMessages:   make(map[string]MessageStorage),
+		CloseCTX:          CloseCTX,
+		CloseCancel:       closeCancel,
+		RouterCloseCTX:    routerCloseCTX,
 	}
 	route.WaitRoutineCTX, route.WaitRoutineCancel = context.WithCancel(context.Background())
 	go route.watchTimedOutMessages()
 	return &route, outputChannel
+}
+
+func (r *Route) CloseRoute() {
+	r.CloseCancel()
 }

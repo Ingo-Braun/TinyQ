@@ -110,7 +110,7 @@ func (router *Router) StopRouter() {
 func (router *Router) RegisterRoute(routeKey string) {
 	if !router.HasRoute(routeKey) {
 		router.routesMutex.Lock()
-		route, _ := Route.SetupRoute()
+		route, _ := Route.SetupRoute(router.stopCTX)
 		router.Routes[routeKey] = route
 		router.routesMutex.Unlock()
 	}
