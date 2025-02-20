@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"errors"
+
 	"github.com/Ingo-Braun/TinyQ/consumer"
 	"github.com/Ingo-Braun/TinyQ/publishers/simple"
 	Messages "github.com/Ingo-Braun/TinyQ/structs/messages"
@@ -174,4 +176,9 @@ func (router *Router) HasRoute(routeKey string) bool {
 	_, ok := router.Routes[routeKey]
 	router.routesMutex.Unlock()
 	return ok
+}
+
+// Checks if the router is running
+func (router *Router) IsRunning() bool {
+	return !errors.Is(router.stopCTX.Err(), context.Canceled)
 }
