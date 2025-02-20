@@ -15,7 +15,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-// N times witch the router wil try to deliver
+// N times witch the router will try to deliver
 // TODO: allow retry count as an configurable varibale
 const reDeliverCount int = 5
 
@@ -65,7 +65,7 @@ writeLoop:
 // Router worker to pass messages from the input channel to destination routes
 // messages with an invalid destination are discarted
 // this worker temporary locks the Routes map to deliver the message
-// this wil try to deliver the message up to reDeliverCount (5)
+// this will try to deliver the message up to reDeliverCount (5)
 func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 	var routerMessage *Messages.RouterMessage
 	for {
@@ -89,7 +89,7 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 
 // Initializes the router and start the router distibution worker
 // Call this BEFORE using anything from the router
-// NIL pointer exceptions wil be rised if not called before use
+// NIL pointer exceptions will be rised if not called before use
 func (router *Router) InitRouter() {
 	log.Println("starting router")
 	router.RouterInput = make(chan *Messages.RouterMessage)
@@ -100,9 +100,9 @@ func (router *Router) InitRouter() {
 }
 
 // Stops everything
-// distribution worker wil be stopped
-// publishers wil be stopped
-// consumers wil be stopped
+// distribution worker will be stopped
+// publishers will be stopped
+// consumers will be stopped
 func (router *Router) StopRouter() {
 	router.stopCTXCancel()
 }
@@ -120,7 +120,7 @@ func (router *Router) RegisterRoute(routeKey string) {
 }
 
 // Removes an route
-// This wil stop all consumers connected to this route and deletes all messages
+// This will stop all consumers connected to this route and deletes all messages
 // Calling twice on same route key is fine
 func (router *Router) UnregisterRoute(routeKey string) {
 	router.routesMutex.Lock()
@@ -130,7 +130,7 @@ func (router *Router) UnregisterRoute(routeKey string) {
 
 // Returns the router input channel as an ponter
 // you should never need this use with caution
-// Warning closing this channel wil break things widout any chance of recover
+// Warning closing this channel will break things widout any chance of recover
 func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
 	return &router.RouterInput
 }

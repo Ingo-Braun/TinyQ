@@ -394,9 +394,9 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 	// create an new publisher
 	publisher := router.GetPublisher()
 
-	// create consumer that wil let the message expire
+	// create consumer that will let the message expire
 	consumer1 := router.GetConsumer("test")
-	// create consumer that wil retreive the expired message as new
+	// create consumer that will retreive the expired message as new
 	consumer2 := router.GetConsumer("test")
 
 	route, ok := router.GetRoute("test")

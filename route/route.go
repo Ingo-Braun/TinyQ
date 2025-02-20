@@ -25,7 +25,7 @@ type MessageStorage struct {
 // Use SetupRoute to create an new Route
 // DO NOT CREATE AN ROUTE FROM SCRATCH
 type Route struct {
-	// channel that wil hold the messages to deliver
+	// channel that will hold the messages to deliver
 	Channel chan *Messages.RouterMessage
 	// priority channel to deliver expired messages as "new"
 	reDeliveryChannel chan *Messages.RouterMessage
@@ -180,7 +180,7 @@ func SetupRoute(routerCloseCTX context.Context) (*Route, chan *Messages.RouterMe
 
 // Closes the route
 // This propagates to all consumers linked to this route
-// WARNING calling this wil delere all messages in the route
+// WARNING calling this will delere all messages in the route
 func (r *Route) CloseRoute() {
 	r.CloseCancel()
 	r.WaitRoutineCancel()
