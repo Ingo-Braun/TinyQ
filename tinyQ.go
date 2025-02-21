@@ -15,7 +15,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.4.0-alpha-1"
+const Version = "v0.4.1-alpha-1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable varibale
@@ -213,6 +213,6 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 	return nil, false
 }
 
-func (r *Router) EneableOdometer() {
+func (r *Router) EnableOdometer() {
 	r.odometer = true
 }
