@@ -15,13 +15,14 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
+const Version = "v0.4.0-alpha-1"
+
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable varibale
 const reDeliverCount int = 5
 
-// Max messages in queue to an route until block
-// TODO: allow max queue size as an configurable variable on route creation
-const maxChanSize int = 30
+// default maximum of messages in an Route
+const DefaultMaxRouteSize int = 300
 
 // Main router, responsible to route messages into routes
 // call InitRouter to initialize the router
@@ -38,6 +39,12 @@ type Router struct {
 	// Router stop context
 	stopCTX       context.Context
 	stopCTXCancel context.CancelFunc
+	// Total messages passed in the input channel
+	// fail to delivery counts
+	TotalMessages int64
+	// Total messages sent to Routes
+	TotalDelivered int64
+	odometer       bool
 }
 
 // Ad-hoc message deliver delivery`s a message widouth the need to use an publisher
@@ -54,8 +61,11 @@ writeLoop:
 			break writeLoop
 		default:
 
-			if len(destinationRoute.Channel) < maxChanSize {
+			if len(destinationRoute.Channel) < destinationRoute.ChanSize {
 				destinationRoute.Channel <- routerMessage
+				if router.odometer {
+					router.TotalDelivered++
+				}
 				break writeLoop
 			}
 		}
@@ -74,6 +84,9 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 			log.Println("stopping router consumer")
 			return
 		case routerMessage = <-router.RouterInput:
+			if router.odometer {
+				router.TotalMessages++
+			}
 			if routerMessage.RetrySend < reDeliverCount {
 				destinationRoute, ok := router.GetRoute(routerMessage.Route)
 				if ok {
@@ -95,6 +108,8 @@ func (router *Router) InitRouter() {
 	router.RouterInput = make(chan *Messages.RouterMessage)
 	router.Routes = make(map[string]*Route.Route)
 	router.stopCTX, router.stopCTXCancel = context.WithCancel(context.Background())
+	router.TotalDelivered = 0
+	router.TotalMessages = 0
 	go router.routerDistributionWorker(router.stopCTX)
 	log.Println("router started")
 }
@@ -110,10 +125,10 @@ func (router *Router) StopRouter() {
 // Register a new route
 // Call this BEFORE publishing any message
 // Calling two times on same route key is fine
-func (router *Router) RegisterRoute(routeKey string) {
+func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
 	if !router.HasRoute(routeKey) {
 		router.routesMutex.Lock()
-		route, _ := Route.SetupRoute(router.stopCTX)
+		route, _ := Route.SetupRoute(router.stopCTX, routeMaxSize)
 		router.Routes[routeKey] = route
 		router.routesMutex.Unlock()
 	}
@@ -136,12 +151,13 @@ func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
 }
 
 // Creates and returns a new consumer to an route key
+// if an route does not exist creates one with DefaultMaxChanSize
 // Every consumer is thread safe
 // use as many as you need
 func (router *Router) GetConsumer(routeKey string) *consumer.Consumer {
 	consumer := consumer.Consumer{}
 	if !router.HasRoute(routeKey) {
-		router.RegisterRoute(routeKey)
+		router.RegisterRoute(routeKey, DefaultMaxRouteSize)
 	}
 	route, ok := router.GetRoute(routeKey)
 	if ok {
@@ -195,4 +211,8 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 		return &subscriber, true
 	}
 	return nil, false
+}
+
+func (r *Router) EneableOdometer() {
+	r.odometer = true
 }
