@@ -15,7 +15,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.3.2-alpha-1"
+const Version = "v0.4.0-alpha-1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable varibale
@@ -39,6 +39,12 @@ type Router struct {
 	// Router stop context
 	stopCTX       context.Context
 	stopCTXCancel context.CancelFunc
+	// Total messages passed in the input channel
+	// fail to delivery counts
+	TotalMessages int64
+	// Total messages sent to Routes
+	TotalDelivered int64
+	odometer       bool
 }
 
 // Ad-hoc message deliver delivery`s a message widouth the need to use an publisher
@@ -57,6 +63,9 @@ writeLoop:
 
 			if len(destinationRoute.Channel) < destinationRoute.ChanSize {
 				destinationRoute.Channel <- routerMessage
+				if router.odometer {
+					router.TotalDelivered++
+				}
 				break writeLoop
 			}
 		}
@@ -75,6 +84,9 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 			log.Println("stopping router consumer")
 			return
 		case routerMessage = <-router.RouterInput:
+			if router.odometer {
+				router.TotalMessages++
+			}
 			if routerMessage.RetrySend < reDeliverCount {
 				destinationRoute, ok := router.GetRoute(routerMessage.Route)
 				if ok {
@@ -96,6 +108,8 @@ func (router *Router) InitRouter() {
 	router.RouterInput = make(chan *Messages.RouterMessage)
 	router.Routes = make(map[string]*Route.Route)
 	router.stopCTX, router.stopCTXCancel = context.WithCancel(context.Background())
+	router.TotalDelivered = 0
+	router.TotalMessages = 0
 	go router.routerDistributionWorker(router.stopCTX)
 	log.Println("router started")
 }
@@ -197,4 +211,8 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 		return &subscriber, true
 	}
 	return nil, false
+}
+
+func (r *Router) EneableOdometer() {
+	r.odometer = true
 }
