@@ -15,15 +15,14 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const version = "v0.2.2-alpha-1"
+const Version = "v0.3.2-alpha-1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable varibale
 const reDeliverCount int = 5
 
-// Max messages in queue to an route until block
-// TODO: allow max queue size as an configurable variable on route creation
-const maxChanSize int = 30
+// default maximum of messages in an Route
+const DefaultMaxRouteSize int = 300
 
 // Main router, responsible to route messages into routes
 // call InitRouter to initialize the router
@@ -56,7 +55,7 @@ writeLoop:
 			break writeLoop
 		default:
 
-			if len(destinationRoute.Channel) < maxChanSize {
+			if len(destinationRoute.Channel) < destinationRoute.ChanSize {
 				destinationRoute.Channel <- routerMessage
 				break writeLoop
 			}
@@ -112,10 +111,10 @@ func (router *Router) StopRouter() {
 // Register a new route
 // Call this BEFORE publishing any message
 // Calling two times on same route key is fine
-func (router *Router) RegisterRoute(routeKey string) {
+func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
 	if !router.HasRoute(routeKey) {
 		router.routesMutex.Lock()
-		route, _ := Route.SetupRoute(router.stopCTX)
+		route, _ := Route.SetupRoute(router.stopCTX, routeMaxSize)
 		router.Routes[routeKey] = route
 		router.routesMutex.Unlock()
 	}
@@ -138,12 +137,13 @@ func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
 }
 
 // Creates and returns a new consumer to an route key
+// if an route does not exist creates one with DefaultMaxChanSize
 // Every consumer is thread safe
 // use as many as you need
 func (router *Router) GetConsumer(routeKey string) *consumer.Consumer {
 	consumer := consumer.Consumer{}
 	if !router.HasRoute(routeKey) {
-		router.RegisterRoute(routeKey)
+		router.RegisterRoute(routeKey, DefaultMaxRouteSize)
 	}
 	route, ok := router.GetRoute(routeKey)
 	if ok {

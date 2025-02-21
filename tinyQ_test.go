@@ -69,7 +69,7 @@ func TestCreateRoute(t *testing.T) {
 	router := startRouter()
 	t.Cleanup(router.StopRouter)
 	t.Log("creating route test")
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 	if !router.HasRoute("test") {
 		t.Error("failed to create route")
 	}
@@ -81,7 +81,7 @@ func TestCreatePublisher(t *testing.T) {
 	t.Log("starting router")
 	router := startRouter()
 	t.Cleanup(router.StopRouter)
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 	publisher := router.GetPublisher()
 	if publisher == nil {
 		t.Error("failed to create Publisher")
@@ -95,7 +95,7 @@ func TestCreateBasicConsummer(t *testing.T) {
 	t.Log("starting router")
 	router := startRouter()
 	t.Cleanup(router.StopRouter)
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 	consummer := router.GetConsumer("test")
 	if consummer == nil {
 		t.Error("failed to create Consummer")
@@ -131,7 +131,7 @@ func TestSend(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -173,7 +173,7 @@ func TestSendAndReceive(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -228,7 +228,7 @@ func TestAck(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -281,7 +281,7 @@ func TestNotAck(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -326,7 +326,7 @@ func TestReAquireMessage(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -389,7 +389,7 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -468,9 +468,9 @@ func TestCreateMultiplePublishers(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test routes
-	router.RegisterRoute("test1")
-	router.RegisterRoute("test2")
-	router.RegisterRoute("test3")
+	router.RegisterRoute("test1", tinyQ.DefaultMaxRouteSize)
+	router.RegisterRoute("test2", tinyQ.DefaultMaxRouteSize)
+	router.RegisterRoute("test3", tinyQ.DefaultMaxRouteSize)
 
 	// creating the publishers
 	publisher1 := router.GetPublisher()
@@ -551,7 +551,7 @@ func TestMultiSend(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	returnChannel := make(chan int)
 	// start 3 go routines "publisher workers" sending 10 messages each
@@ -630,7 +630,7 @@ func TestMultiReceive(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()
@@ -739,7 +739,7 @@ func TestSubscriber(t *testing.T) {
 	t.Cleanup(router.StopRouter)
 
 	// register the test route
-	router.RegisterRoute("test")
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
 
 	// create an new publisher
 	publisher := router.GetPublisher()

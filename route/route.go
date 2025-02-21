@@ -10,9 +10,6 @@ import (
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
-// default maximum of messages in an Route
-const defaultMaxChanSize int = 30
-
 const MessageRetrivalTimeout = 100
 
 // message storage to awating confirmation (Ack) messages
@@ -41,6 +38,8 @@ type Route struct {
 	CloseCancel context.CancelFunc
 	// router closing context
 	RouterCloseCTX context.Context
+	// Size of the channel
+	ChanSize int
 }
 
 // validate and propagetes the closing context of the Router
@@ -162,16 +161,17 @@ func (r *Route) GetConsummerId(message *Messages.RouterMessage) (string, bool) {
 }
 
 // Setups the Route and start the expired messages routine
-func SetupRoute(routerCloseCTX context.Context) (*Route, chan *Messages.RouterMessage) {
-	outputChannel := make(chan *Messages.RouterMessage, defaultMaxChanSize)
+func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *Messages.RouterMessage) {
+	outputChannel := make(chan *Messages.RouterMessage, channelSize)
 	CloseCTX, closeCancel := context.WithCancel(context.Background())
 	route := Route{
 		Channel:           outputChannel,
-		reDeliveryChannel: make(chan *Messages.RouterMessage, defaultMaxChanSize),
+		reDeliveryChannel: make(chan *Messages.RouterMessage, channelSize),
 		awaitingMessages:  make(map[string]MessageStorage),
 		CloseCTX:          CloseCTX,
 		CloseCancel:       closeCancel,
 		RouterCloseCTX:    routerCloseCTX,
+		ChanSize:          channelSize,
 	}
 	route.WaitRoutineCTX, route.WaitRoutineCancel = context.WithCancel(context.Background())
 	go route.watchTimedOutMessages()
