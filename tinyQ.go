@@ -15,7 +15,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.4.1-alpha-1"
+const Version = "v0.5.0-alpha-1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable varibale
@@ -44,7 +44,9 @@ type Router struct {
 	TotalMessages int64
 	// Total messages sent to Routes
 	TotalDelivered int64
-	odometer       bool
+	// Total messages lost
+	TotalLost int64
+	odometer  bool
 }
 
 // Ad-hoc message deliver delivery`s a message widouth the need to use an publisher
@@ -93,7 +95,13 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 					router.deliverMessage(routerMessage, destinationRoute)
 					continue
 				}
+				if router.odometer {
+					router.TotalLost++
+				}
 				log.Printf("discarting message to route %v due not being registred\n", routerMessage.Route)
+			}
+			if router.odometer {
+				router.TotalLost++
 			}
 			log.Println("discarting message due to max retries exceded")
 		}
@@ -110,6 +118,7 @@ func (router *Router) InitRouter() {
 	router.stopCTX, router.stopCTXCancel = context.WithCancel(context.Background())
 	router.TotalDelivered = 0
 	router.TotalMessages = 0
+	router.TotalLost = 0
 	go router.routerDistributionWorker(router.stopCTX)
 	log.Println("router started")
 }
