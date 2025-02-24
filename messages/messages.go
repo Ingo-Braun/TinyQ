@@ -30,7 +30,7 @@ func (r *RouterMessage) GetId() string {
 	return r.id
 }
 
-// DO NOT CALL THIS outise the route scope
+// DO NOT CALL THIS outside the route scope
 // Stops the delivery timer
 func (r *RouterMessage) Ack() bool {
 	r.deliverCancel()

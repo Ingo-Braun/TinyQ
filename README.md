@@ -4,7 +4,7 @@
 
 ## Overview
 
-Greatings this library implements the basics of an message queue system.
+Greetings this library implements the basics of an message queue system.
 
 TinyQ implements:
 
@@ -13,7 +13,7 @@ TinyQ implements:
 - Consumers
 - Message Confirmation (ACK)
 
-## Instalation
+## Installation
 
     go get github.com/Ingo-Braun/TinyQ
 
@@ -103,9 +103,9 @@ func main() {
 
     - Routing messages from it`s own input queue to destination Routes.
     - Handling with destination Routes (Registration and Deletion)
-    - Attatching to it self Publishers, Subscribers and Consumers
+    - Attaching to it self Publishers, Subscribers and Consumers
 
-    On calling the StopRouter function all messages routing will stop, all attatched Publishers, Subscribers and Consumers will stop
+    On calling the StopRouter function all messages routing will stop, all attached Publishers, Subscribers and Consumers will stop
 
 ### Publisher
 
@@ -117,24 +117,24 @@ func main() {
 
 ### Consumer
 
-    The consumer is the basic form of getting an message from it`s attatched Route.
+    The consumer is the basic form of getting an message from it`s attached Route.
 
     When GetMessage is called the consumer wil try to retrieve an message for **200 ms**.
 
     If an message is retrieved than will return an Message (RouterMessage) and an ok flag (bool).
     and start the delivery timer.
 
-    If it fails to retrive an message will return nil,false.
+    If it fails to retrieve an message will return nil,false.
 
     To confirm an message use it`s Ack  method passing the message.
 
-    When confirming an message an flag (bool) will be returned indicating success on acknolowdge
+    When confirming an message an flag (bool) will be returned indicating success on acknowledge
 
 ### Subscriber
 
     The Subscriber is an more elaborate way of getting messages.
 
-    The Subscriber works on an Callback basis. when an message is retrived it invokes the callback
+    The Subscriber works on an Callback basis. when an message is retrieved it invokes the callback
 
     The callback function needs to have **both** **message *Messages.RouterMessage and Ack context.CancelFunc** as parameters
 

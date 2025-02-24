@@ -10,27 +10,27 @@ import (
 	"github.com/google/uuid"
 )
 
-// Milliseconds (ms) to retrive a message or move on
+// Milliseconds (ms) to retrieve a message or move on
 // TODO: allow this value as parameter
-const MessageRetrivalTimeout = 200
+const MessageRetrievalTimeout = 200
 
 type Consumer struct {
 	// Consumer id used to check responsability on message ack
 	id string
-	// Route linked to this conssumer
+	// Route linked to this consumer
 	route *Route.Route
 	// Route Closing context if this is done the route has ben closed
 	routeCloseCTX context.Context
 }
 
-// Attempts to retrive an message from route using MessageRetrivalTimeout const
-// Every message retrived starts an delivery timer to Ack
-// if the delivery timer expires the message is invalid and becomes avaliable to retrival again
+// Attempts to retrieve an message from route using MessageRetrievalTimeout const
+// Every message retrieved starts an delivery timer to Ack
+// if the delivery timer expires the message is invalid and becomes available to retrieval again
 // returns an message and an ok
-// if the retrival operation times out returns nil,false
+// if the retrieval operation times out returns nil,false
 // if the route is closed returns nil,false
 func (c *Consumer) GetMessage() (*Messages.RouterMessage, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*MessageRetrivalTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*MessageRetrievalTimeout)
 	defer cancel()
 	for {
 		select {
@@ -52,7 +52,7 @@ func (c *Consumer) GetId() string {
 	return c.id
 }
 
-// Initializes the consummer on an route
+// Initializes the consumer on an route
 func (c *Consumer) Setup(route *Route.Route) {
 	c.route = route
 	c.id = uuid.New().String()

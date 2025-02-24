@@ -10,9 +10,9 @@ import (
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
-const MessageRetrivalTimeout = 100
+const MessageRetrievalTimeout = 100
 
-// message storage to awating confirmation (Ack) messages
+// message storage to awaiting confirmation (Ack) messages
 type MessageStorage struct {
 	ConsumerId string
 	Message    *Messages.RouterMessage
@@ -26,14 +26,14 @@ type Route struct {
 	Channel chan *Messages.RouterMessage
 	// priority channel to deliver expired messages as "new"
 	reDeliveryChannel chan *Messages.RouterMessage
-	// map of messages awating confirmation [messageId]messageStorage struct
+	// map of messages awaiting confirmation [messageId]messageStorage struct
 	awaitingMessages map[string]MessageStorage
-	// wating messages mutex
+	// waiting messages mutex
 	awaitingMessagesMutex sync.Mutex
-	// context to controll expired messages routine
+	// context to control expired messages routine
 	WaitRoutineCTX    context.Context
 	WaitRoutineCancel context.CancelFunc
-	// contex to controll when the route is closed
+	// context to control when the route is closed
 	CloseCTX    context.Context
 	CloseCancel context.CancelFunc
 	// router closing context
@@ -42,7 +42,7 @@ type Route struct {
 	ChanSize int
 }
 
-// validate and propagetes the closing context of the Router
+// validate and propagates the closing context of the Router
 func (r *Route) checkIfRouterIsClosed() {
 	select {
 	case <-r.RouterCloseCTX.Done():
@@ -53,20 +53,20 @@ func (r *Route) checkIfRouterIsClosed() {
 	}
 }
 
-// Attempts to retrive an message in MessageRetrivalTimeout milliseconds (ms)
+// Attempts to retrieve an message in MessageRetrievalTimeout milliseconds (ms)
 // Return nil,false if the Route is Closed
-// Return nil,false if message retrival failed
-// Attempts to retrive from priority channel (reDeliveryChannel)
+// Return nil,false if message retrieval failed
+// Attempts to retrieve from priority channel (reDeliveryChannel)
 // If fails to get from reDeliveryChannel
-// Attempts to retrive from priority channel (reDeliveryChannel)
-// On retrival sucess lock the awating messages map
+// Attempts to retrieve from priority channel (reDeliveryChannel)
+// On retrieval success lock the awaiting messages map
 // Set the message timer
 // Creates an message container with the consumer id and the message
-// Puts the message in the awating messages map
-// Unlocks the awating messages map
+// Puts the message in the awaiting messages map
+// Unlocks the awaiting messages map
 // Returns message,true
 func (r *Route) GetMessage(consumerId string) (*Messages.RouterMessage, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*MessageRetrivalTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*MessageRetrievalTimeout)
 	for {
 
 		select {
@@ -99,15 +99,15 @@ func (r *Route) GetMessage(consumerId string) (*Messages.RouterMessage, bool) {
 }
 
 // Returns the size of the normal channel plus the priority channel
-// since both channels are live when mesuring it is not garante of an acurate number
-// NOT ACURATE
+// since both channels are live when measuring it is not ensure of an accurate number
+// NOT ACCURATE
 func (r *Route) Size() int {
 	r.checkIfRouterIsClosed()
 	return len(r.Channel) + len(r.reDeliveryChannel)
 }
 
-// Routine that checks on the awating messages map in search of expired messages
-// upon finding an expired message removes from the awating messages map and puts on the priority queue
+// Routine that checks on the awaiting messages map in search of expired messages
+// upon finding an expired message removes from the awaiting messages map and puts on the priority queue
 func (r *Route) watchTimedOutMessages() {
 	for {
 		select {
@@ -132,9 +132,9 @@ func (r *Route) watchTimedOutMessages() {
 }
 
 // Confirms an message
-// Messages can only be confirmed by the consumerId in the message container in the awating message map [messageId].ConsumerId
+// Messages can only be confirmed by the consumerId in the message container in the awaiting message map [messageId].ConsumerId
 // This prevents an race condition where an late consumer
-// that aquired first an message can confirm a message that has been delivered to other consumer
+// that acquired first an message can confirm a message that has been delivered to other consumer
 func (r *Route) Ack(consumerId string, messageId string) bool {
 	r.awaitingMessagesMutex.Lock()
 	defer r.awaitingMessagesMutex.Unlock()
@@ -146,11 +146,11 @@ func (r *Route) Ack(consumerId string, messageId string) bool {
 	return false
 }
 
-// Returns the Consumer id of an awating message map
-// This can be used to check if an consumer stil is responsible for that message
+// Returns the Consumer id of an awaiting message map
+// This can be used to check if an consumer still is responsible for that message
 // Changes when an expired message get processed by the expired messages routine
-// Changes when an message is retrived by an consumer
-func (r *Route) GetConsummerId(message *Messages.RouterMessage) (string, bool) {
+// Changes when an message is retrieved by an consumer
+func (r *Route) GetConsumerId(message *Messages.RouterMessage) (string, bool) {
 	r.awaitingMessagesMutex.Lock()
 	defer r.awaitingMessagesMutex.Unlock()
 	messageStorage, ok := r.awaitingMessages[message.GetId()]
@@ -180,7 +180,7 @@ func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *
 
 // Closes the route
 // This propagates to all consumers linked to this route
-// WARNING calling this will delere all messages in the route
+// WARNING calling this will delete all messages in the route
 func (r *Route) CloseRoute() {
 	r.CloseCancel()
 	r.WaitRoutineCancel()

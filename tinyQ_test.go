@@ -22,7 +22,7 @@ func startRouter() *tinyQ.Router {
 }
 
 // helper function to get messages from an consumer
-// consumer shuld timeout before
+// consumer should timeout before
 func receiveMessage(consumer *consumer.Consumer) (*messages.RouterMessage, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*2000)
 	for {
@@ -91,39 +91,39 @@ func TestCreatePublisher(t *testing.T) {
 
 // Tests creating an consumer
 // fails if the consumer is nil
-func TestCreateBasicConsummer(t *testing.T) {
+func TestCreateBasicConsumer(t *testing.T) {
 	t.Log("starting router")
 	router := startRouter()
 	t.Cleanup(router.StopRouter)
 	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
-	consummer := router.GetConsumer("test")
-	if consummer == nil {
-		t.Error("failed to create Consummer")
+	consumer := router.GetConsumer("test")
+	if consumer == nil {
+		t.Error("failed to create Consumer")
 		t.FailNow()
 	}
 }
 
-// Tests if creating an conssumer to an not registered route automaticaly creates the route
+// Tests if creating an Consumer to an not registered route automatically creates the route
 // fails if the consumer is nil
-// fails if the router dont create the route automaticaly
-func TestCreateBasicConssumerNotRegisteredRoute(t *testing.T) {
+// fails if the router does not create the route automatically
+func TestCreateBasicConsumerNotRegisteredRoute(t *testing.T) {
 	t.Log("starting router")
 	router := startRouter()
 	t.Cleanup(router.StopRouter)
-	consummer := router.GetConsumer("test")
-	if consummer == nil {
-		t.Error("failed to create Consummer")
+	consumer := router.GetConsumer("test")
+	if consumer == nil {
+		t.Error("failed to create Consumer")
 		t.FailNow()
 	}
 	if router.HasRoute("test") {
-		t.Log("router created test route automaticaly")
+		t.Log("router created test route automatically")
 	}
 }
 
 // Test sending an message
 // fails if there is an failure in delivering the message
 // fails if the route size is 0
-// the reading of the Route size is realiable due to not having an consummer attatched to it
+// the reading of the Route size is reliable due to not having an consumer attached to it
 func TestSend(t *testing.T) {
 	// setup
 	t.Log("starting router")
@@ -141,7 +141,7 @@ func TestSend(t *testing.T) {
 	_, ok := publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -154,7 +154,7 @@ func TestSend(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		if route.Size() == 0 {
-			t.Logf("route didint receive message queue size %v", route.Size())
+			t.Logf("route did not receive message queue size %v", route.Size())
 			t.FailNow()
 		}
 	}
@@ -163,9 +163,9 @@ func TestSend(t *testing.T) {
 
 // Tests sending an message and receiving using an consumer
 // fails if there is an failure in delivering the message
-// fails if there is an failure in retriving the message
-// fails if the message content is diferent from the original
-// fails if the message id is diferent from the id returned on publish
+// fails if there is an failure in retrieving the message
+// fails if the message content is different from the original
+// fails if the message id is different from the id returned on publish
 func TestSendAndReceive(t *testing.T) {
 	// setup
 	t.Log("starting router")
@@ -178,7 +178,7 @@ func TestSendAndReceive(t *testing.T) {
 	// create an new publisher
 	publisher := router.GetPublisher()
 
-	// create an new conssumer to the test route
+	// create an new Consumer to the test route
 	consumer := router.GetConsumer("test")
 
 	// creates the test message and publishes
@@ -186,7 +186,7 @@ func TestSendAndReceive(t *testing.T) {
 	messageId, ok := publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -198,13 +198,13 @@ func TestSendAndReceive(t *testing.T) {
 	route, _ := router.GetRoute("test")
 
 	// logs the queue size
-	// this reading shuld be reliable since no message has been consumed from the Route
+	// this reading should be reliable since no message has been consumed from the Route
 	t.Logf("queue size %v", route.Size())
 
-	// retrives the message
+	// retrieves the message
 	message, ok := receiveMessage(consumer)
 	if !ok {
-		t.Error("failed retriving the message")
+		t.Error("failed retrieving the message")
 		t.FailNow()
 	}
 	if string(message.Content) != messageText {
@@ -212,14 +212,14 @@ func TestSendAndReceive(t *testing.T) {
 		t.FailNow()
 	}
 	if message.GetId() != messageId {
-		t.Errorf("message id missmatch expected %v got %v", messageId, message.GetId())
+		t.Errorf("message id mismatch expected %v got %v", messageId, message.GetId())
 		t.FailNow()
 	}
 }
 
 // Tests message Ack
 // fails if there is an failure in delivering the message
-// fails if there is an failure in retriving the message
+// fails if there is an failure in retrieving the message
 // fails if Ack returns not nil
 func TestAck(t *testing.T) {
 	// setup
@@ -233,7 +233,7 @@ func TestAck(t *testing.T) {
 	// create an new publisher
 	publisher := router.GetPublisher()
 
-	// create an new conssumer to the test route
+	// create an new Consumer to the test route
 	consumer := router.GetConsumer("test")
 
 	// creates the test message and publishes
@@ -241,7 +241,7 @@ func TestAck(t *testing.T) {
 	_, ok := publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -251,13 +251,13 @@ func TestAck(t *testing.T) {
 
 	message, ok := receiveMessage(consumer)
 	if !ok {
-		t.Error("failed retriving the message")
+		t.Error("failed retrieving the message")
 		t.FailNow()
 	}
 	if ok && string(message.Content) == messageText {
 		t.Log("testing ack")
 		t.Logf("is message expired %v", message.IsExpired())
-		t.Logf("is message valide %v", message.IsValid())
+		t.Logf("is message valid %v", message.IsValid())
 		if message.IsExpired() == false && message.IsValid() {
 			err := consumer.Ack(message)
 			if !err {
@@ -272,7 +272,7 @@ func TestAck(t *testing.T) {
 
 // Test if the message expires
 // fails if there is an failure in delivering the message
-// fails if there is an failure in retriving the message
+// fails if there is an failure in retrieving the message
 // fails if IsExpired returns false
 func TestNotAck(t *testing.T) {
 	// setup
@@ -286,7 +286,7 @@ func TestNotAck(t *testing.T) {
 	// create an new publisher
 	publisher := router.GetPublisher()
 
-	// create an new conssumer to the test route
+	// create an new Consumer to the test route
 	consumer := router.GetConsumer("test")
 
 	// creates the test message and publishes
@@ -294,7 +294,7 @@ func TestNotAck(t *testing.T) {
 	_, ok := publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -307,7 +307,7 @@ func TestNotAck(t *testing.T) {
 		time.Sleep(time.Millisecond * (messages.DeliveryTimeout + 100))
 		expired := message.IsExpired()
 		if !expired {
-			t.Error("message didint expire")
+			t.Error("message did not expire")
 			t.Log(message.DeliveryErr())
 			t.FailNow()
 		}
@@ -316,10 +316,10 @@ func TestNotAck(t *testing.T) {
 
 // Test if an expired message is re-delivered
 // fails if there is an failure in delivering the message
-// fails if there is an failure in retriving the message
+// fails if there is an failure in retrieving the message
 // fails if initial message IsExpired returns false
 
-func TestReAquireMessage(t *testing.T) {
+func TestReAcquireMessage(t *testing.T) {
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -331,7 +331,7 @@ func TestReAquireMessage(t *testing.T) {
 	// create an new publisher
 	publisher := router.GetPublisher()
 
-	// create an new conssumer to the test route
+	// create an new Consumer to the test route
 	consumer := router.GetConsumer("test")
 
 	// creates the test message and publishes
@@ -339,7 +339,7 @@ func TestReAquireMessage(t *testing.T) {
 	_, ok := publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -349,21 +349,21 @@ func TestReAquireMessage(t *testing.T) {
 
 	message, ok := receiveMessage(consumer)
 	if ok {
-		// deley to make the message expire
+		// delay to make the message expire
 		time.Sleep(time.Millisecond * (messages.DeliveryTimeout + 200))
 		if !message.IsExpired() {
-			t.Error("message didint expire")
+			t.Error("message did not expire")
 			t.Error(message.DeliveryErr())
 			t.Error(message.GetId())
 			t.FailNow()
 		}
 	}
-	t.Log("message has expired trying to re-aquire")
+	t.Log("message has expired trying to re-acquire")
 	id := message.GetId()
 
 	// delay for the route expired messages worker to do its job
 	time.Sleep(time.Millisecond * 100)
-	// acquire previus expired message as an "new" message
+	// acquire previous expired message as an "new" message
 	message, ok = receiveMessage(consumer)
 	if ok {
 		// checks if new acquired message is the same as the expired one
@@ -376,13 +376,13 @@ func TestReAquireMessage(t *testing.T) {
 
 // Test getting an message that has expired by other consumer
 // fails if there is an failure in delivering the message
-// fails if there is an failure in retriving the message
-// fails if there is no message on the wating map on the test Route
-// fails if the first consumer is not the one responsible to that message in the wating delivery map in the Router
-// fails if the expired message acquired by the second consumer has diferent id
-// fails if the second consumer is not the one responsible to that message in the wating delivery map in the Router
+// fails if there is an failure in retrieving the message
+// fails if there is no message on the waiting map on the test Route
+// fails if the first consumer is not the one responsible to that message in the waiting delivery map in the Router
+// fails if the expired message acquired by the second consumer has different id
+// fails if the second consumer is not the one responsible to that message in the waiting delivery map in the Router
 // fails if the message is not expired after expiring delay
-func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
+func TestAcquireExpiredMessageByOtherConsumer(t *testing.T) {
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -396,7 +396,7 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 
 	// create consumer that will let the message expire
 	consumer1 := router.GetConsumer("test")
-	// create consumer that will retreive the expired message as new
+	// create consumer that will retrieve the expired message as new
 	consumer2 := router.GetConsumer("test")
 
 	route, ok := router.GetRoute("test")
@@ -410,7 +410,7 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 	_, ok = publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -421,14 +421,14 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 		t.Error("failed getting message")
 		t.FailNow()
 	}
-	// gets the consumer id attatched to the waiting delivery map in the Router
-	// this shuld change if the message is acquired by other consumer
-	routeConsumerId, ok := route.GetConsummerId(message)
+	// gets the consumer id attached to the waiting delivery map in the Router
+	// this should change if the message is acquired by other consumer
+	routeConsumerId, ok := route.GetConsumerId(message)
 	if !ok {
 		t.Error("failed getting router consumer id for message")
 		t.FailNow()
 	}
-	// fails if the first consumer is not the one responsible to that message in the wating delivery map in the Router
+	// fails if the first consumer is not the one responsible to that message in the waiting delivery map in the Router
 	if routeConsumerId != consumer1.GetId() {
 		t.Errorf("route consumer id mismatch expected %v got %v", consumer1.GetId(), routeConsumerId)
 		t.FailNow()
@@ -439,7 +439,7 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 		t.Error("message is not expired")
 		t.FailNow()
 	}
-	// retrive expired message as new using consumer 2
+	// retrieve expired message as new using consumer 2
 	var message2 *messages.RouterMessage
 	message2, ok = receiveMessage(consumer2)
 	if !ok {
@@ -450,7 +450,7 @@ func TestAquireExpiredMessageByOtherConsumer(t *testing.T) {
 		t.Errorf("message id mismatch expected %v got %v", originalMessageId, message2.GetId())
 	}
 
-	routeConsumerId2, _ := route.GetConsummerId(message2)
+	routeConsumerId2, _ := route.GetConsumerId(message2)
 	if routeConsumerId2 != consumer2.GetId() {
 		t.Errorf("route consumer id mismatch expected %v got %v", consumer2.GetId(), routeConsumerId2)
 		t.FailNow()
@@ -483,7 +483,7 @@ func TestCreateMultiplePublishers(t *testing.T) {
 	_, ok = publisher1.Publish([]byte(messageText), "test1")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -491,7 +491,7 @@ func TestCreateMultiplePublishers(t *testing.T) {
 	_, ok = publisher2.Publish([]byte(messageText), "test2")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 
@@ -500,7 +500,7 @@ func TestCreateMultiplePublishers(t *testing.T) {
 	_, ok = publisher3.Publish([]byte(messageText), "test3")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 	// delay to wait for the Router delivery worker
@@ -542,7 +542,7 @@ func TestCreateMultiplePublishers(t *testing.T) {
 }
 
 // Test sending messages from multiple go routines
-// fails if the publisher workers dont finish sending each 10 messages in 5 seconds
+// fails if the publisher workers does not finish sending each 10 messages in 5 seconds
 // fails if the message count in the route is not 30
 func TestMultiSend(t *testing.T) {
 	// setup
@@ -555,7 +555,7 @@ func TestMultiSend(t *testing.T) {
 
 	returnChannel := make(chan int)
 	// start 3 go routines "publisher workers" sending 10 messages each
-	// each worker sends an true to the reutn channel to track the progress
+	// each worker sends an true to the return channel to track the progress
 	for worker := range 3 {
 		// waitGroup.Add(1)
 		go func() {
@@ -572,7 +572,7 @@ func TestMultiSend(t *testing.T) {
 				_, ok := publisher.Publish([]byte(messageText), "test")
 
 				if !ok {
-					t.Errorf("failed deliveing message to Router from worker %v", worker)
+					t.Errorf("failed delivering message to Router from worker %v", worker)
 				}
 			}
 			returnChannel <- worker
@@ -589,7 +589,7 @@ waitLoop:
 		select {
 		case <-ctx.Done():
 			cancel()
-			t.Error("timedout wating workers")
+			t.Error("timeout waiting workers")
 			t.FailNow()
 			return
 		case workerId := <-returnChannel:
@@ -620,8 +620,8 @@ waitLoop:
 
 // Test multiple go routines consumers
 // fails if there is an failure in delivering the messages
-// fails if test route dont have 20 messages before the retrival process
-// fails if retreived messages channel dont have 20 messages
+// fails if test route does not have 20 messages before the retrieval process
+// fails if retrieved messages channel does not have 20 messages
 // fails if the sum of every message (1..20) is not 210 (the sum of every number between 1 and 20 is 210)
 func TestMultiReceive(t *testing.T) {
 	// setup
@@ -643,7 +643,7 @@ func TestMultiReceive(t *testing.T) {
 		_, ok := publisher.Publish(arr, "test")
 
 		if !ok {
-			t.Error("failed deliveing message to Router")
+			t.Error("failed delivering message to Router")
 			t.FailNow()
 		}
 	}
@@ -661,14 +661,14 @@ func TestMultiReceive(t *testing.T) {
 	t.Log("messages sent, processing output")
 
 	// creating the output channel for the workers responses
-	// 100 shuld be plenty on any mistake case
+	// 100 should be plenty on any mistake case
 	returnChan := make(chan []byte, 100)
 
-	// consume timer to give plenty of time to exaust the 20 messages
+	// consume timer to give plenty of time to exhaust the 20 messages
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	// starting contex to initiate all consumer routines at the same time
+	// starting context to initiate all consumer routines at the same time
 	startCtx, start := context.WithCancel(context.Background())
 	for workerId := range 3 {
 		go func() {
@@ -691,7 +691,7 @@ func TestMultiReceive(t *testing.T) {
 		}()
 	}
 
-	// delay to make schure every worker is set
+	// delay to make shure every worker is set
 	time.Sleep(time.Millisecond * 100)
 	t.Log("workers are set")
 
@@ -700,7 +700,7 @@ func TestMultiReceive(t *testing.T) {
 	// this size checking is safe due to no consumer is running
 	t.Logf("route has %v messages", route.Size())
 
-	// start the consummers
+	// start the consumers
 	start()
 
 	// blocks until the consume timer runs out
@@ -729,9 +729,9 @@ func TestMultiReceive(t *testing.T) {
 // Test subscriber calling an call back function
 // fails if there is an failure in delivering the messages
 // fails if subscriber is not running
-// fails if subscriber dont call the callback function in 10 seconds
+// fails if subscriber does not call the callback function in 10 seconds
 // fails if the callback function is not executed
-// fails if the id of the message received by the callback function dosent match original message id
+// fails if the id of the message received by the callback function does not match original message id
 func TestSubscriber(t *testing.T) {
 	// setup
 	t.Log("starting router")
@@ -749,13 +749,13 @@ func TestSubscriber(t *testing.T) {
 	messageId, ok := publisher.Publish([]byte(messageText), "test")
 
 	if !ok {
-		t.Error("failed deliveing message to Router")
+		t.Error("failed delivering message to Router")
 		t.FailNow()
 	}
 	// timer to call callback function
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-	// cancel if message received in callback function dosent match original message
+	// cancel if message received in callback function does not match original message
 	failCtx, failCancel := context.WithCancel(context.Background())
 
 	// using channel to bypass scope and allow response from callback function

@@ -15,10 +15,10 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.5.0-alpha-1"
+const Version = "v0.5.1-alpha-1"
 
 // N times witch the router will try to deliver
-// TODO: allow retry count as an configurable varibale
+// TODO: allow retry count as an configurable variable
 const reDeliverCount int = 5
 
 // default maximum of messages in an Route
@@ -49,7 +49,7 @@ type Router struct {
 	odometer  bool
 }
 
-// Ad-hoc message deliver delivery`s a message widouth the need to use an publisher
+// Ad-hoc message deliver delivery`s a message widout the need to use an publisher
 func (router *Router) deliverMessage(routerMessage *Messages.RouterMessage, destinationRoute *Route.Route) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
@@ -98,7 +98,7 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 				if router.odometer {
 					router.TotalLost++
 				}
-				log.Printf("discarting message to route %v due not being registred\n", routerMessage.Route)
+				log.Printf("discarting message to route %v due not being registered\n", routerMessage.Route)
 			}
 			if router.odometer {
 				router.TotalLost++
@@ -108,7 +108,7 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 	}
 }
 
-// Initializes the router and start the router distibution worker
+// Initializes the router and start the router distribution worker
 // Call this BEFORE using anything from the router
 // NIL pointer exceptions will be rised if not called before use
 func (router *Router) InitRouter() {
@@ -152,7 +152,7 @@ func (router *Router) UnregisterRoute(routeKey string) {
 	router.routesMutex.Unlock()
 }
 
-// Returns the router input channel as an ponter
+// Returns the router input channel as an pointer
 // you should never need this use with caution
 // Warning closing this channel will break things widout any chance of recover
 func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
@@ -196,7 +196,7 @@ func (router *Router) GetPublisher() *simple.SimplePublisher {
 }
 
 // Checks if the router has an route with that route key
-// This locks the Routes map to get the awnser
+// This locks the Routes map to get the answer
 func (router *Router) HasRoute(routeKey string) bool {
 	router.routesMutex.Lock()
 	_, ok := router.Routes[routeKey]
