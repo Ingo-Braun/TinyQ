@@ -794,3 +794,88 @@ func TestSubscriber(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+// Test Router odometer
+// fails if the Total messages count is not 20
+// fails if the Total messages delivered count is not 10
+// fails if the Total messages failed count is not 10
+func TestOdometer(t *testing.T) {
+	// setup
+	t.Log("starting router")
+	router := startRouter()
+	t.Cleanup(router.StopRouter)
+
+	// register the test route
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
+	router.EnableOdometer()
+	publisher := router.GetPublisher()
+
+	for range 10 {
+		publisher.Publish([]byte("test"), "test")
+	}
+
+	for range 10 {
+		publisher.Publish([]byte("test"), "Non exists")
+	}
+
+	time.Sleep(time.Second * 2)
+
+	if router.TotalMessages != 20 {
+		t.Errorf("failed counting total messages expected %v got %v\n", 20, router.TotalMessages)
+		t.FailNow()
+	}
+
+	if router.TotalDelivered != 10 {
+		t.Errorf("failed counting total messages delivered expected %v got %v\n", 10, router.TotalDelivered)
+		t.FailNow()
+	}
+
+	if router.TotalLost != 10 {
+		t.Errorf("failed counting total messages lost expected %v got %v\n", 10, router.TotalLost)
+		t.FailNow()
+	}
+
+}
+
+// func TestDeletingRoute(t *testing.T){
+// 	t.Log("starting router")
+// 	router := startRouter()
+// 	t.Cleanup(router.StopRouter)
+
+// 	// register the test route
+// 	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
+
+// }
+
+// Test Dedicated publisher
+// fails if route does not exists
+// fails if there is an failure in delivering the messages
+// fails if the route size is not 1 after message delivery
+func TestDedicatedPublisher(t *testing.T) {
+	// setup
+	t.Log("starting router")
+	router := startRouter()
+	t.Cleanup(router.StopRouter)
+
+	// register the test route
+	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
+
+	dedicatedPublisher := router.GetDedicatedPublisher("test")
+
+	route, ok := router.GetRoute("test")
+	if !ok {
+		t.Error("failed getting route")
+		t.FailNow()
+	}
+
+	_, ok = dedicatedPublisher.Publish([]byte("test"))
+
+	if !ok {
+		t.Error("failed publishing message")
+		t.FailNow()
+	}
+	if route.Size() != 1 {
+		t.Errorf("test failed route size mismatch expected %v got %v ", 1, route.Size())
+		t.FailNow()
+	}
+}

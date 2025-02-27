@@ -2,6 +2,7 @@ package route
 
 import (
 	"context"
+	"errors"
 	"log"
 	"maps"
 	"sync"
@@ -184,4 +185,8 @@ func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *
 func (r *Route) CloseRoute() {
 	r.CloseCancel()
 	r.WaitRoutineCancel()
+}
+
+func (r *Route) IsActive() bool {
+	return !errors.Is(r.CloseCTX.Err(), context.Canceled)
 }

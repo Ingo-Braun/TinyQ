@@ -10,12 +10,13 @@ import (
 
 	"github.com/Ingo-Braun/TinyQ/consumer"
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
-	"github.com/Ingo-Braun/TinyQ/publishers/simple"
+	DedicatedPublisher "github.com/Ingo-Braun/TinyQ/publishers/dedicated"
+	SimplePublisher "github.com/Ingo-Braun/TinyQ/publishers/simple"
 	Route "github.com/Ingo-Braun/TinyQ/route"
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.5.2-alpha-1"
+const Version = "v0.6.0-alpha-1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -46,7 +47,9 @@ type Router struct {
 	TotalDelivered int64
 	// Total messages lost
 	TotalLost int64
-	odometer  bool
+	// Total redelivery attempts
+	TotalReDelivered int64
+	odometer         bool
 }
 
 // Ad-hoc message deliver delivery`s a message widout the need to use an publisher
@@ -96,7 +99,7 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 					continue
 				}
 				if router.odometer {
-					router.TotalLost++
+					router.TotalReDelivered++
 				}
 				log.Printf("discarting message to route %v due not being registered\n", routerMessage.Route)
 			}
@@ -119,6 +122,7 @@ func (router *Router) InitRouter() {
 	router.TotalDelivered = 0
 	router.TotalMessages = 0
 	router.TotalLost = 0
+	router.TotalReDelivered = 0
 	go router.routerDistributionWorker(router.stopCTX)
 	log.Println("router started")
 }
@@ -154,7 +158,7 @@ func (router *Router) UnregisterRoute(routeKey string) {
 
 // Returns the router input channel as an pointer
 // you should never need this use with caution
-// Warning closing this channel will break things widout any chance of recover
+// Warning closing this channel will break things without any chance of recover
 func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
 	return &router.RouterInput
 }
@@ -189,10 +193,28 @@ func (router *Router) GetRoute(routeKey string) (*Route.Route, bool) {
 // Every message published goes to the router input channel for distribution
 // Every publisher is thread safe
 // Use as many as you need
-func (router *Router) GetPublisher() *simple.SimplePublisher {
-	publisher := simple.SimplePublisher{}
+func (router *Router) GetPublisher() *SimplePublisher.SimplePublisher {
+	publisher := SimplePublisher.SimplePublisher{}
 	publisher.StartPublisher(router.GetInputChannel(), router.stopCTX)
 	return &publisher
+}
+
+// Creates and return a new publisher vinculated to an specific route
+// Every message published goes to the router input channel for distribution
+// Every dedicated publisher is thread safe
+// Use as many as you need
+// returns nil if failed to get the route with the routing key
+func (router *Router) GetDedicatedPublisher(routeKey string) *DedicatedPublisher.DedicatedPublisher {
+	if router.HasRoute(routeKey) {
+		publisher := DedicatedPublisher.DedicatedPublisher{}
+		route, ok := router.GetRoute(routeKey)
+		if !ok {
+			return nil
+		}
+		publisher.StartPublisher(routeKey, route, router.stopCTX)
+		return &publisher
+	}
+	return nil
 }
 
 // Checks if the router has an route with that route key
