@@ -101,49 +101,43 @@ func main() {
 
     The Router is the heart of TinyQ. he is responsible for:
 
-    - Routing messages from it`s own input queue to destination Routes.
-    - Handling with destination Routes (Registration and Deletion)
-    - Attaching to it self Publishers, Subscribers and Consumers
+        - Routing messages from it`s own input queue to destination Routes.
+        - Handling with destination Routes (Registration and Deletion)
+        - Attaching to it self Publishers, Subscribers and Consumers
 
     On calling the StopRouter function all messages routing will stop, all attached Publishers, Subscribers and Consumers will stop
 
 ### Publisher
 
     The publisher is responsible for publishing messages to an Router using an RouteKey.
-
     When Publish is called it returns the publisher message id (string) and an ok flag (bool).
-
     If the Router is stopped the id will always be an **empty** string and ok will be **false**.
+
+### Dedicated Publisher
+
+    The Dedicated Publisher is similar to the Publisher.
+    Instead of publishing messages to the Router input it sends direct to the Route itself
+    Dedicated Publishers allow a lower latency and more direct approach with the drawback of being Dedicated to one Route
+    If the Router is stopped or the bonded Route closes the message id will always be an **empty** string and ok will be **false**.
 
 ### Consumer
 
     The consumer is the basic form of getting an message from it`s attached Route.
-
     When GetMessage is called the consumer wil try to retrieve an message for **200 ms**.
-
-    If an message is retrieved than will return an Message (RouterMessage) and an ok flag (bool).
-    and start the delivery timer.
-
+    If an message is retrieved than will return an Message (RouterMessage) and an ok flag (bool). and start the delivery timer.
     If it fails to retrieve an message will return nil,false.
-
     To confirm an message use it`s Ack  method passing the message.
-
     When confirming an message an flag (bool) will be returned indicating success on acknowledge
 
 ### Subscriber
 
     The Subscriber is an more elaborate way of getting messages.
-
     The Subscriber works on an Callback basis. when an message is retrieved it invokes the callback
-
     The callback function needs to have **both** **message *Messages.RouterMessage and Ack context.CancelFunc** as parameters
 
 ### Message
 
     The Message is the basic form of Routing message and it contains all the information necessary to pass information from the input Route to the destination Route.
-
     The message contents need to be an array of byte ([]byte).
-
     The message Route is the Routing Key used to route the messages
-
     **Warning DO NOT use the Ack function**
