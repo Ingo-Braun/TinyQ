@@ -691,7 +691,7 @@ func TestMultiReceive(t *testing.T) {
 		}()
 	}
 
-	// delay to make shure every worker is set
+	// delay to make sure every worker is set
 	time.Sleep(time.Millisecond * 100)
 	t.Log("workers are set")
 

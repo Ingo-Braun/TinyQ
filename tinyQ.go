@@ -15,7 +15,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.5.1-alpha-1"
+const Version = "v0.5.2-alpha-1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
