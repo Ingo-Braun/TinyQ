@@ -63,10 +63,30 @@ func (s *Subscriber) Consumer() {
 	}
 }
 
-func (s *Subscriber) IsRunning() bool {
-	return !errors.Is(s.closeCTX.Err(), context.Canceled)
+// joins the subscriber close context and route close context
+// returns if the route context OR the subscriber context is closed
+func (s *Subscriber) Join() {
+	for {
+		select {
+		case <-s.closeCTX.Done():
+			return
+		case <-s.closeCTX.Done():
+			return
+		default:
+			time.Sleep(time.Millisecond * 100)
+		}
+	}
 }
 
-func (s *Subscriber) Join() {
-	<-s.closeCTX.Done()
+// check if the route is closed or its own close context has been called
+// if the route is not active than there is no reason this should be active
+func (s *Subscriber) IsRunning() bool {
+	return !errors.Is(s.closeCTX.Err(), context.Canceled) || !errors.Is(s.routeCloseCTX.Err(), context.Canceled)
+}
+
+// check if the route is closed or its own close context has been called
+// if the route is not active than there is no reason this should be active
+// this is to keep consistency to other consumers
+func (s *Subscriber) IsClosed() bool {
+	return errors.Is(s.closeCTX.Err(), context.Canceled) || errors.Is(s.routeCloseCTX.Err(), context.Canceled)
 }

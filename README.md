@@ -1,6 +1,6 @@
 # TinyQ
 
-**An Tiny message queue implementation**
+**A Tiny message queue implementation**
 
 ## Overview
 
@@ -95,6 +95,30 @@ func main() {
 
 ```
 
+## Stopping
+
+Stopping is straightforward
+
+To stop the router call **StopRouter**
+
+To stop an Route either call on router StopRoute passing the route key or on the Route it self call **CloseRoute**
+
+To stop an subscriber call **Close**
+
+All publishers, dedicated publishers and consumers wil close when either the **Router** or the **Route** is **Closed**
+
+### Warning
+
+When closing either the **Router** or **Route** is **Closed** it cascades closing **Everything** attached to it
+
+The Close cascade goes from: **Router** -> **Publisher** -> **Route** -> **Dedicated Publishers** -> **Consumers and Subscribers**
+
+If you call
+
+    Router.StopRouter()
+
+Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop working and wil be safe to delete
+
 ## Components
 
 ### Router
@@ -141,3 +165,4 @@ func main() {
     The message contents need to be an array of byte ([]byte).
     The message Route is the Routing Key used to route the messages
     **Warning DO NOT use the Ack function**
+

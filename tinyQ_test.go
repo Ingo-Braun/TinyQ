@@ -837,15 +837,119 @@ func TestOdometer(t *testing.T) {
 
 }
 
-// func TestDeletingRoute(t *testing.T){
-// 	t.Log("starting router")
-// 	router := startRouter()
-// 	t.Cleanup(router.StopRouter)
+// Test if an Route is closed other routes keep working and the consumers attached to that route also stops
+// Fails if the ClosingRoute is not closed
+// Fails if the consumer attached to the ClosingRoute is not closed after ClosingRoute close
+// Fails if the KeepRunningRoute does not have 2 message after closing the ClosingRoute
+// Fails if the KeepRunningRoute is closed after ClosingRoute is closed
+// Fails if the KeepRunningConsumer is closed after ClosingRoute is closed
+func TesStopRoute(t *testing.T) {
+	// setup
+	t.Log("starting router")
+	router := startRouter()
+	t.Cleanup(router.StopRouter)
 
-// 	// register the test route
-// 	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
+	// register the test route
+	testClosingRoute := "test1"
+	testKeepRunningRoute := "test2"
 
-// }
+	router.RegisterRoute(testClosingRoute, tinyQ.DefaultMaxRouteSize)
+	router.RegisterRoute(testKeepRunningRoute, tinyQ.DefaultMaxRouteSize)
+
+	publisher := router.GetPublisher()
+
+	// consumer that wil stop working
+	ClosingConsumer := router.GetConsumer(testClosingRoute)
+	// consumer that should keep running
+	KeepRunningConsumer := router.GetConsumer(testKeepRunningRoute)
+
+	publisher.Publish([]byte("test"), testClosingRoute)
+	publisher.Publish([]byte("test"), testKeepRunningRoute)
+
+	// route that wil be closed
+	ClosingRoute, _ := router.GetRoute(testClosingRoute)
+	// route that should keep working
+	KeepRunningRoute, _ := router.GetRoute(testKeepRunningRoute)
+
+	ClosingRoute.CloseRoute()
+
+	if !ClosingRoute.IsClosed() {
+		t.Error("test failed route is not closed")
+		t.FailNow()
+	}
+
+	if !ClosingConsumer.IsClosed() {
+		t.Error("test failed consumer is not closed after route close")
+		t.FailNow()
+	}
+
+	publisher.Publish([]byte("test"), testKeepRunningRoute)
+	time.Sleep(time.Millisecond * 10)
+	if KeepRunningRoute.Size() != 2 {
+		t.Errorf("test failed route 2 size mismatch expected %v got %v \n", 2, KeepRunningRoute.Size())
+		t.FailNow()
+	}
+
+	if KeepRunningRoute.IsClosed() {
+		t.Error("test failed route 2 is closed")
+		t.FailNow()
+	}
+
+	if KeepRunningConsumer.IsClosed() {
+		t.Error("test failed consumer2 is closed")
+		t.FailNow()
+	}
+}
+
+func TestClosingRouter(t *testing.T) {
+	t.Log("starting router")
+	router := startRouter()
+
+	// register the test route
+	router.RegisterRoute("test1", tinyQ.DefaultMaxRouteSize)
+	router.RegisterRoute("test2", tinyQ.DefaultMaxRouteSize)
+
+	publisher := router.GetPublisher()
+
+	dedicatedPublisher := router.GetDedicatedPublisher("test1")
+
+	consumer1 := router.GetConsumer("test1")
+
+	testCallback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+		ack()
+	}
+
+	subscriber, _ := router.GetSubscriber("test2", testCallback)
+
+	router.StopRouter()
+	time.Sleep(time.Millisecond * 100)
+
+	if router.IsRunning() {
+		t.Error("test failed router is not closed")
+		t.FailNow()
+	}
+
+	if !publisher.IsClosed() {
+		t.Error("test failed publisher is not closed")
+		t.FailNow()
+	}
+
+	if !dedicatedPublisher.IsClosed() {
+		t.Error("test failed dedicated publisher is not closed")
+		t.FailNow()
+	}
+
+	if !consumer1.IsClosed() {
+		t.Error("test failed consumer is not closed")
+		t.FailNow()
+	}
+
+	if !subscriber.IsClosed() {
+		t.Error("test failed subscriber is not closed")
+		t.FailNow()
+	}
+
+}
 
 // Test Dedicated publisher
 // fails if route does not exists
