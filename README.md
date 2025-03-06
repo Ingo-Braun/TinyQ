@@ -1,6 +1,6 @@
 # TinyQ
 
-**An Tiny message queue implementation**
+**A Tiny message queue implementation**
 
 ## Overview
 
@@ -165,3 +165,4 @@ Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop workin
     The message contents need to be an array of byte ([]byte).
     The message Route is the Routing Key used to route the messages
     **Warning DO NOT use the Ack function**
+
