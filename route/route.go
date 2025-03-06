@@ -183,10 +183,12 @@ func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *
 // This propagates to all consumers linked to this route
 // WARNING calling this will delete all messages in the route
 func (r *Route) CloseRoute() {
-	r.CloseCancel()
-	r.WaitRoutineCancel()
+	if !r.IsClosed() {
+		r.CloseCancel()
+		r.WaitRoutineCancel()
+	}
 }
 
-func (r *Route) IsActive() bool {
-	return !errors.Is(r.CloseCTX.Err(), context.Canceled)
+func (r *Route) IsClosed() bool {
+	return errors.Is(r.CloseCTX.Err(), context.Canceled) || errors.Is(r.RouterCloseCTX.Err(), context.Canceled)
 }

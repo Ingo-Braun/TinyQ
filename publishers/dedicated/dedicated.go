@@ -2,6 +2,7 @@ package dedicated
 
 import (
 	"context"
+	"fmt"
 
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 	Route "github.com/Ingo-Braun/TinyQ/route"
@@ -22,7 +23,7 @@ func (pub *DedicatedPublisher) Publish(content []byte) (string, bool) {
 	case <-pub.routerStopCTX.Done():
 		return "", false
 	default:
-		if pub.route.IsActive() {
+		if !pub.route.IsClosed() {
 			routerMessage := Messages.CreateMessage(content, pub.routeKey)
 			messageId := routerMessage.GetId()
 			pub.route.Channel <- routerMessage
@@ -42,5 +43,13 @@ func (pub *DedicatedPublisher) StartPublisher(routeKey string, route *Route.Rout
 // check if the route is active
 // if the route is not active than there is no reason this should be active
 func (pub *DedicatedPublisher) IsActive() bool {
-	return pub.route.IsActive()
+	return !pub.route.IsClosed()
+}
+
+// check if the route is closed
+// if the route is not active than there is no reason this should be active
+// this is to keep consistency to other publishers
+func (pub *DedicatedPublisher) IsClosed() bool {
+	fmt.Println(pub.route.IsClosed())
+	return pub.route.IsClosed()
 }

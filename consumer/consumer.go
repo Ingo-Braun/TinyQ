@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -69,4 +70,8 @@ func (c *Consumer) Size() int {
 // This stops the message delivery timer
 func (c *Consumer) Ack(message *Messages.RouterMessage) bool {
 	return c.route.Ack(c.GetId(), message.GetId())
+}
+
+func (c *Consumer) IsClosed() bool {
+	return errors.Is(c.routeCloseCTX.Err(), context.Canceled)
 }

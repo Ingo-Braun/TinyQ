@@ -2,6 +2,7 @@ package simple
 
 import (
 	"context"
+	"errors"
 
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
@@ -31,4 +32,8 @@ func (pub *SimplePublisher) Publish(content []byte, RouteKey string) (string, bo
 func (pub *SimplePublisher) StartPublisher(output *chan *Messages.RouterMessage, routerStopCTX context.Context) {
 	pub.routerStopCTX = routerStopCTX
 	pub.outputChan = *output
+}
+
+func (pub *SimplePublisher) IsClosed() bool {
+	return errors.Is(pub.routerStopCTX.Err(), context.Canceled)
 }
