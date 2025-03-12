@@ -11,7 +11,7 @@ import (
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
-const MessageRetrievalTimeout = 100
+const MessageRetrievalTimeout = 10000
 
 // message storage to awaiting confirmation (Ack) messages
 type MessageStorage struct {
