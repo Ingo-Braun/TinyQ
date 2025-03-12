@@ -143,6 +143,7 @@ func (r *Route) Ack(consumerId string, messageId string) bool {
 	messageStorage, ok := r.awaitingMessages[messageId]
 	if ok && messageStorage.ConsumerId == consumerId {
 		messageStorage.Message.Ack()
+		delete(r.awaitingMessages, messageId)
 		return true
 	}
 	return false
@@ -192,4 +193,13 @@ func (r *Route) CloseRoute() {
 
 func (r *Route) IsClosed() bool {
 	return errors.Is(r.CloseCTX.Err(), context.Canceled) || errors.Is(r.RouterCloseCTX.Err(), context.Canceled)
+}
+
+// Validates if an message is in awaiting ack
+// returns true if message is in awaiting ack
+func (r *Route) IsWaitingAck(messageId string) bool {
+	r.awaitingMessagesMutex.Lock()
+	defer r.awaitingMessagesMutex.Unlock()
+	_, ok := r.awaitingMessages[messageId]
+	return ok
 }

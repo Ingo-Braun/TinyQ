@@ -263,6 +263,11 @@ func TestAck(t *testing.T) {
 			if !err {
 				t.FailNow()
 			}
+			route, _ := router.GetRoute("test")
+			if route.IsWaitingAck(message.GetId()) {
+				t.Error("test failed message is in awaiting ack")
+				t.FailNow()
+			}
 		}
 	} else if ok && string(message.Content) != messageText {
 		t.Errorf("failed receiving message sent %v received %v", messageText, string(message.Content))
@@ -304,7 +309,7 @@ func TestNotAck(t *testing.T) {
 
 	message, ok := receiveMessage(consumer)
 	if ok {
-		time.Sleep(time.Millisecond * (messages.DeliveryTimeout + 100))
+		time.Sleep(messages.DeliveryTimeout + (time.Millisecond * 100))
 		expired := message.IsExpired()
 		if !expired {
 			t.Error("message did not expire")
@@ -350,7 +355,7 @@ func TestReAcquireMessage(t *testing.T) {
 	message, ok := receiveMessage(consumer)
 	if ok {
 		// delay to make the message expire
-		time.Sleep(time.Millisecond * (messages.DeliveryTimeout + 200))
+		time.Sleep(messages.DeliveryTimeout + (time.Millisecond * 100))
 		if !message.IsExpired() {
 			t.Error("message did not expire")
 			t.Error(message.DeliveryErr())
@@ -434,7 +439,7 @@ func TestAcquireExpiredMessageByOtherConsumer(t *testing.T) {
 		t.FailNow()
 	}
 	// delay to let the message expire
-	time.Sleep(time.Millisecond * (messages.DeliveryTimeout + 100))
+	time.Sleep(messages.DeliveryTimeout + (time.Millisecond * 100))
 	if !message.IsExpired() {
 		t.Error("message is not expired")
 		t.FailNow()
