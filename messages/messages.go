@@ -9,7 +9,7 @@ import (
 )
 
 // Milliseconds (ms) until message expires if not ack
-const DeliveryTimeout = 20000
+const DeliveryTimeout = time.Second * 20
 
 type RouterMessage struct {
 	// Message UUID
@@ -57,7 +57,7 @@ func (r *RouterMessage) DeliveryErr() error {
 
 // Resets the delivery timer
 func (r *RouterMessage) SetDeliveryTimer() {
-	r.deliverCTX, r.deliverCancel = context.WithTimeout(context.Background(), time.Millisecond*DeliveryTimeout)
+	r.deliverCTX, r.deliverCancel = context.WithTimeout(context.Background(), DeliveryTimeout)
 	r.RetrySend++
 }
 

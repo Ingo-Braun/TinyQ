@@ -11,7 +11,7 @@ import (
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
-const MessageRetrievalTimeout = 10000
+const MessageRetrievalTimeout = 100
 
 // message storage to awaiting confirmation (Ack) messages
 type MessageStorage struct {
@@ -110,11 +110,13 @@ func (r *Route) Size() int {
 // Routine that checks on the awaiting messages map in search of expired messages
 // upon finding an expired message removes from the awaiting messages map and puts on the priority queue
 func (r *Route) watchTimedOutMessages() {
+	ticker := time.NewTicker(time.Millisecond * 10)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-r.WaitRoutineCTX.Done():
 			return
-		default:
+		case <-ticker.C:
 			r.checkIfRouterIsClosed()
 			r.awaitingMessagesMutex.Lock()
 			for key := range maps.Keys(r.awaitingMessages) {
@@ -126,7 +128,6 @@ func (r *Route) watchTimedOutMessages() {
 				}
 			}
 			r.awaitingMessagesMutex.Unlock()
-			time.Sleep(time.Millisecond * 10)
 		}
 
 	}
