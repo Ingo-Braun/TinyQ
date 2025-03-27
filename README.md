@@ -2,6 +2,28 @@
 
 **A Tiny message queue implementation**
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Installation](#installation)
+3. [Usage](#usage)
+    1. [Creating Routers](#creating-routers)
+    2. [Registering Routes](#registering-routes)
+    3. [Creating Publishers and publishing Messages](#creating-publishers-and-publishing-messages)
+    4. [Creating Consumers and getting Messages](#creating-consumers-and-getting-messages)
+    5. [Creating an Subscriber and Callback function](#creating-an-subscriber-and-callback-function)
+4. [Stopping](#stopping)
+
+5. [Components](#components)
+    - [Router](#router)
+    - [Publisher](#publisher)
+    - [Dedicated Publisher](#dedicated-publisher)
+    - [Subscriber](#subscriber)
+    - [Message](#message)
+
+6. [FAQ](#faq)
+7. [Motivation](#motivation)
+
 ## Overview
 
 Greetings this library implements the basics of an message queue system.
@@ -19,7 +41,7 @@ TinyQ implements:
 
 ## Usage
 
-### Creating the Router
+### Creating Routers
 
 ```go
 
@@ -36,14 +58,14 @@ func main(){
 }
 ```
 
-### Registering the Route
+### Registering Routes
 
 ```go
 routeKey := "Route1"
-router.RegisterRoute(routeKey)
+router.RegisterRoute(routeKey, tinyQ.DefaultMaxRouteSize)
 ```
 
-### Creating an Publisher and publishing an message
+### Creating Publishers and publishing Messages
 
 ```go
 publisher := router.GetPublisher()
@@ -51,7 +73,7 @@ message := []byte("Hello World")
 messageId,ok := publisher.Publish(message,routeKey)
 ```
 
-### Creating an Consumer and getting an message
+### Creating Consumers and getting Messages
 
 ```go
 consumer := router.GetConsumer(routeKey)
@@ -73,6 +95,7 @@ import (
 )
 
 func callback(message *Messages.RouterMessage, Ack context.CancelFunc) {
+    fmt.Println("message received")
     fmt.Println(string(message.Content))
     Ack()
 }
@@ -83,10 +106,11 @@ func main() {
     defer router.StopRouter()
 
     routeKey := "Route1"
-    router.RegisterRoute(routeKey)
+    router.RegisterRoute(routeKey, tinyQ.DefaultMaxRouteSize)
 
     publisher := router.GetPublisher()
     message := []byte("Hello World")
+    fmt.Println("publishing message....")
     publisher.Publish(message, routeKey)
 
     subscriber, _ := router.GetSubscriber(routeKey, callback)
@@ -115,7 +139,7 @@ The Close cascade goes from: **Router** -> **Publisher** -> **Route** -> **Dedic
 
 If you call
 
-    Router.StopRouter()
+    router.StopRouter()
 
 Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop working and wil be safe to delete
 
@@ -166,3 +190,18 @@ Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop workin
     The message Route is the Routing Key used to route the messages
     Warning DO NOT use the Ack function
 
+## FAQ
+
+### There is any persistence ?
+
+No there is NO persistence. everything is in Memory.
+
+### Is safe to call router.StopRouter() ?
+
+Stopping any router created should never raise panic. see [`stop warning`](#warning) for better explanation.
+
+## Motivation
+
+    I created this module because i have seen time and time again this pattern, either in an distributed environment or inside an program.
+    You need to pass (messages / tasks / jobs / events) to some (Handler / Worker / Tread / Process) locally or remote. you end up building a message queue system of some sort, and after building a couple of them i decided to create my own to understand how message queues works.
+    
