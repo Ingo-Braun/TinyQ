@@ -202,6 +202,5 @@ Stopping any router created should never raise panic. see [`stop warning`](#warn
 
 ## Motivation
 
-    I created this module because i have seen time and time again this pattern, either in an distributed environment or inside an program.
-    You need to pass (messages / tasks / jobs / events) to some (Handler / Worker / Tread / Process) locally or remote. you end up building a message queue system of some sort, and after building a couple of them i decided to create my own to understand how message queues works.
-    
+I created this module because i have seen time and time again this pattern, either in an distributed environment or inside an program.
+You need to pass (messages / tasks / jobs / events) to some (Handler / Worker / Tread / Process) locally or remote. you end up building a message queue system of some sort, and after building a couple of them i decided to create my own to understand how message queues works.
