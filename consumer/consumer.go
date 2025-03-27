@@ -72,6 +72,13 @@ func (c *Consumer) Ack(message *Messages.RouterMessage) bool {
 	return c.route.Ack(c.GetId(), message.GetId())
 }
 
+// Confirm receiving an message by message id
+// You can only confirm an message from the same consumer
+// This stops the message delivery timer
+func (c *Consumer) AckByID(messageId string) bool {
+	return c.route.Ack(c.GetId(), messageId)
+}
+
 func (c *Consumer) IsClosed() bool {
 	return errors.Is(c.routeCloseCTX.Err(), context.Canceled)
 }

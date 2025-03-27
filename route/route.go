@@ -110,11 +110,13 @@ func (r *Route) Size() int {
 // Routine that checks on the awaiting messages map in search of expired messages
 // upon finding an expired message removes from the awaiting messages map and puts on the priority queue
 func (r *Route) watchTimedOutMessages() {
+	ticker := time.NewTicker(time.Millisecond * 10)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-r.WaitRoutineCTX.Done():
 			return
-		default:
+		case <-ticker.C:
 			r.checkIfRouterIsClosed()
 			r.awaitingMessagesMutex.Lock()
 			for key := range maps.Keys(r.awaitingMessages) {
@@ -126,7 +128,6 @@ func (r *Route) watchTimedOutMessages() {
 				}
 			}
 			r.awaitingMessagesMutex.Unlock()
-			time.Sleep(time.Millisecond * 10)
 		}
 
 	}
@@ -142,6 +143,7 @@ func (r *Route) Ack(consumerId string, messageId string) bool {
 	messageStorage, ok := r.awaitingMessages[messageId]
 	if ok && messageStorage.ConsumerId == consumerId {
 		messageStorage.Message.Ack()
+		delete(r.awaitingMessages, messageId)
 		return true
 	}
 	return false
@@ -191,4 +193,13 @@ func (r *Route) CloseRoute() {
 
 func (r *Route) IsClosed() bool {
 	return errors.Is(r.CloseCTX.Err(), context.Canceled) || errors.Is(r.RouterCloseCTX.Err(), context.Canceled)
+}
+
+// Validates if an message is in awaiting ack
+// returns true if message is in awaiting ack
+func (r *Route) IsWaitingAck(messageId string) bool {
+	r.awaitingMessagesMutex.Lock()
+	defer r.awaitingMessagesMutex.Unlock()
+	_, ok := r.awaitingMessages[messageId]
+	return ok
 }
