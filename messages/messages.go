@@ -71,3 +71,13 @@ func CreateMessage(content []byte, routeKey string) *RouterMessage {
 		id:        uuid.New().String(),
 	}
 }
+
+type TelemetryPackage struct {
+	Type  string
+	Value int
+}
+
+const TelemetryTypeMessagesSent string = "Sent"
+const TelemetryTypeMessagesProcessed string = "Processed"
+const TelemetryTypeMessagesDiscarded string = "Discarded"
+const TelemetryTypeMessagesResent string = "Resent"
