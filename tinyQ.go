@@ -16,7 +16,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.8.1"
+const Version = "v0.9.0"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -38,18 +38,12 @@ type Router struct {
 	// Router re-send channel not used
 	ResendChannel chan *Messages.RouterMessage
 	// Router stop context
-	stopCTX       context.Context
-	stopCTXCancel context.CancelFunc
-	// Total messages passed in the input channel
-	// fail to delivery counts
-	TotalMessages int64
-	// Total messages sent to Routes
-	TotalDelivered int64
-	// Total messages lost
-	TotalLost int64
-	// Total redelivery attempts
-	TotalReDelivered int64
+	stopCTX          context.Context
+	stopCTXCancel    context.CancelFunc
 	odometer         bool
+	telemetryMutex   sync.Mutex
+	telemetry        *Telemetry
+	telemetryChannel chan Messages.TelemetryPackage
 }
 
 // Ad-hoc message deliver delivery`s a message widout the need to use an publisher
@@ -69,7 +63,10 @@ writeLoop:
 			if len(destinationRoute.Channel) < destinationRoute.ChanSize {
 				destinationRoute.Channel <- routerMessage
 				if router.odometer {
-					router.TotalDelivered++
+					router.telemetryChannel <- Messages.TelemetryPackage{
+						Type:  Messages.TelemetryTypeMessagesProcessed,
+						Value: 1,
+					}
 				}
 				break writeLoop
 			}
@@ -90,7 +87,10 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 			return
 		case routerMessage = <-router.RouterInput:
 			if router.odometer {
-				router.TotalMessages++
+				router.telemetryChannel <- Messages.TelemetryPackage{
+					Type:  Messages.TelemetryTypeMessagesSent,
+					Value: 1,
+				}
 			}
 			if routerMessage.RetrySend < reDeliverCount {
 				destinationRoute, ok := router.GetRoute(routerMessage.Route)
@@ -99,12 +99,18 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 					continue
 				}
 				if router.odometer {
-					router.TotalReDelivered++
+					router.telemetryChannel <- Messages.TelemetryPackage{
+						Type:  Messages.TelemetryTypeMessagesResent,
+						Value: 1,
+					}
 				}
 				log.Printf("discarting message to route %v due not being registered\n", routerMessage.Route)
 			}
 			if router.odometer {
-				router.TotalLost++
+				router.telemetryChannel <- Messages.TelemetryPackage{
+					Type:  Messages.TelemetryTypeMessagesDiscarded,
+					Value: 1,
+				}
 			}
 			log.Println("discarting message due to max retries exceded")
 		}
@@ -119,10 +125,6 @@ func (router *Router) InitRouter() {
 	router.RouterInput = make(chan *Messages.RouterMessage)
 	router.Routes = make(map[string]*Route.Route)
 	router.stopCTX, router.stopCTXCancel = context.WithCancel(context.Background())
-	router.TotalDelivered = 0
-	router.TotalMessages = 0
-	router.TotalLost = 0
-	router.TotalReDelivered = 0
 	go router.routerDistributionWorker(router.stopCTX)
 	log.Println("router started")
 }
@@ -244,8 +246,39 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 	return nil, false
 }
 
+func (router *Router) GetNewTelemetry() Telemetry {
+	router.telemetryMutex.Lock()
+	telemetryCopy := Telemetry{
+		TotalMessages:    router.telemetry.TotalMessages,
+		TotalDelivered:   router.telemetry.TotalDelivered,
+		TotalLost:        router.telemetry.TotalLost,
+		TotalReDelivered: router.telemetry.TotalReDelivered,
+	}
+	router.telemetryMutex.Unlock()
+	return telemetryCopy
+}
+
+func (router *Router) telemetryProcessor() {
+	for {
+		select {
+		case <-router.stopCTX.Done():
+			return
+		case telemetryMessage := <-router.telemetryChannel:
+			router.telemetryMutex.Lock()
+			router.telemetry.UpdateTelemetry(telemetryMessage)
+			router.telemetryMutex.Unlock()
+		default:
+			time.Sleep(time.Millisecond * 10)
+		}
+
+	}
+}
+
 func (router *Router) EnableOdometer() {
 	router.odometer = true
+	router.telemetry = GetNewTelemetry()
+	router.telemetryChannel = make(chan Messages.TelemetryPackage, 1000)
+	go router.telemetryProcessor()
 }
 
 func (router *Router) StopRoute(routeKey string) bool {
@@ -255,4 +288,38 @@ func (router *Router) StopRoute(routeKey string) bool {
 	}
 	route.CloseRoute()
 	return true
+}
+
+type Telemetry struct {
+	// Total messages passed in the input channel
+	// fail to delivery counts
+	TotalMessages int64
+	// Total messages sent to Routes
+	TotalDelivered int64
+	// Total messages lost
+	TotalLost int64
+	// Total redelivery attempts
+	TotalReDelivered int64
+}
+
+func GetNewTelemetry() *Telemetry {
+	return &Telemetry{
+		TotalMessages:    0,
+		TotalDelivered:   0,
+		TotalLost:        0,
+		TotalReDelivered: 0,
+	}
+}
+
+func (t *Telemetry) UpdateTelemetry(telemetryData Messages.TelemetryPackage) {
+	switch telemetryData.Type {
+	case Messages.TelemetryTypeMessagesSent:
+		t.TotalMessages += int64(telemetryData.Value)
+	case Messages.TelemetryTypeMessagesProcessed:
+		t.TotalDelivered += int64(telemetryData.Value)
+	case Messages.TelemetryTypeMessagesDiscarded:
+		t.TotalLost += int64(telemetryData.Value)
+	case Messages.TelemetryTypeMessagesResent:
+		t.TotalReDelivered += int64(telemetryData.Value)
+	}
 }

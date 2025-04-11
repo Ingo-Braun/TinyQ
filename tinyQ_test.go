@@ -825,18 +825,20 @@ func TestOdometer(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	if router.TotalMessages != 20 {
-		t.Errorf("failed counting total messages expected %v got %v\n", 20, router.TotalMessages)
+	telemetry := router.GetNewTelemetry()
+
+	if telemetry.TotalMessages != 20 {
+		t.Errorf("failed counting total messages expected %v got %v\n", 20, telemetry.TotalMessages)
 		t.FailNow()
 	}
 
-	if router.TotalDelivered != 10 {
-		t.Errorf("failed counting total messages delivered expected %v got %v\n", 10, router.TotalDelivered)
+	if telemetry.TotalDelivered != 10 {
+		t.Errorf("failed counting total messages delivered expected %v got %v\n", 10, telemetry.TotalDelivered)
 		t.FailNow()
 	}
 
-	if router.TotalLost != 10 {
-		t.Errorf("failed counting total messages lost expected %v got %v\n", 10, router.TotalLost)
+	if telemetry.TotalLost != 10 {
+		t.Errorf("failed counting total messages lost expected %v got %v\n", 10, telemetry.TotalLost)
 		t.FailNow()
 	}
 
