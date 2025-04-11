@@ -141,7 +141,27 @@ If you call
 
     router.StopRouter()
 
-Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop working and wil be safe to delete
+Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop working and wil be safe to delete.
+
+## Telemetry
+
+The router has its own built in telemetry system, to enable it just call ```router.EnableTelemetry()```.
+
+```go
+func main(){
+    router := tinyQ.Router{}
+    router.InitRouter()
+    defer router.StopRouter()
+
+    router.EnableTelemetry()
+    telemetry := router.GetTelemetry()
+    telemetry.TotalMessages
+    telemetry.TotalDelivered
+    telemetry.TotalLost
+    telemetry.TotalReDelivered
+}
+```
+Every time you call router.GetTelemetry() an copy of the values of the internal telemetry data is returned, it is an photo of the data.
 
 ## Components
 

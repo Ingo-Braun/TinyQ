@@ -812,7 +812,7 @@ func TestOdometer(t *testing.T) {
 
 	// register the test route
 	router.RegisterRoute("test", tinyQ.DefaultMaxRouteSize)
-	router.EnableOdometer()
+	router.EnableTelemetry()
 	publisher := router.GetPublisher()
 
 	for range 10 {
@@ -825,7 +825,7 @@ func TestOdometer(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	telemetry := router.GetNewTelemetry()
+	telemetry := router.GetTelemetry()
 
 	if telemetry.TotalMessages != 20 {
 		t.Errorf("failed counting total messages expected %v got %v\n", 20, telemetry.TotalMessages)

@@ -16,7 +16,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.9.0"
+const Version = "v0.9.1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -246,7 +246,7 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 	return nil, false
 }
 
-func (router *Router) GetNewTelemetry() Telemetry {
+func (router *Router) GetTelemetry() Telemetry {
 	router.telemetryMutex.Lock()
 	telemetryCopy := Telemetry{
 		TotalMessages:    router.telemetry.TotalMessages,
@@ -274,7 +274,7 @@ func (router *Router) telemetryProcessor() {
 	}
 }
 
-func (router *Router) EnableOdometer() {
+func (router *Router) EnableTelemetry() {
 	router.odometer = true
 	router.telemetry = GetNewTelemetry()
 	router.telemetryChannel = make(chan Messages.TelemetryPackage, 1000)
