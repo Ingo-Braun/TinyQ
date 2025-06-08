@@ -43,7 +43,7 @@ func (r *RouterMessage) IsValid() bool {
 	return (r.deliverCTX.Err() == nil || errors.Is(r.deliverCTX.Err(), context.Canceled))
 }
 
-// Returns if the message delivery times has exceded
+// Returns if the message delivery times has exceeded
 // NOT FULL RELIABLE
 // TODO: transfer check to an more reliable source
 func (r *RouterMessage) IsExpired() bool {

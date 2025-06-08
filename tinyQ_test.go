@@ -11,6 +11,7 @@ import (
 
 	tinyQ "github.com/Ingo-Braun/TinyQ"
 	"github.com/Ingo-Braun/TinyQ/consumer"
+	"github.com/Ingo-Braun/TinyQ/hooks"
 	"github.com/Ingo-Braun/TinyQ/messages"
 )
 
@@ -158,7 +159,7 @@ func TestSend(t *testing.T) {
 			t.FailNow()
 		}
 	}
-	t.Logf("route received message !, queue size %v", route.Size())
+	t.Logf("route received message!, queue size %v", route.Size())
 }
 
 // Tests sending an message and receiving using an consumer
@@ -222,6 +223,7 @@ func TestSendAndReceive(t *testing.T) {
 // fails if there is an failure in retrieving the message
 // fails if Ack returns not nil
 func TestAck(t *testing.T) {
+	t.Parallel()
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -280,6 +282,7 @@ func TestAck(t *testing.T) {
 // fails if there is an failure in retrieving the message
 // fails if IsExpired returns false
 func TestNotAck(t *testing.T) {
+	t.Parallel()
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -325,6 +328,7 @@ func TestNotAck(t *testing.T) {
 // fails if initial message IsExpired returns false
 
 func TestReAcquireMessage(t *testing.T) {
+	t.Parallel()
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -388,6 +392,7 @@ func TestReAcquireMessage(t *testing.T) {
 // fails if the second consumer is not the one responsible to that message in the waiting delivery map in the Router
 // fails if the message is not expired after expiring delay
 func TestAcquireExpiredMessageByOtherConsumer(t *testing.T) {
+	t.Parallel()
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -550,6 +555,7 @@ func TestCreateMultiplePublishers(t *testing.T) {
 // fails if the publisher workers does not finish sending each 10 messages in 5 seconds
 // fails if the message count in the route is not 30
 func TestMultiSend(t *testing.T) {
+	t.Parallel()
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -629,6 +635,7 @@ waitLoop:
 // fails if retrieved messages channel does not have 20 messages
 // fails if the sum of every message (1..20) is not 210 (the sum of every number between 1 and 20 is 210)
 func TestMultiReceive(t *testing.T) {
+	t.Parallel()
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -677,7 +684,7 @@ func TestMultiReceive(t *testing.T) {
 	startCtx, start := context.WithCancel(context.Background())
 	for workerId := range 3 {
 		go func() {
-			t.Logf("worker %v is online", workerId)
+			t.Logf("worker %v is online\n", workerId)
 			consumer := router.GetConsumer("test")
 			<-startCtx.Done()
 			for {
@@ -770,8 +777,8 @@ func TestSubscriber(t *testing.T) {
 	// callback function in compliance to subscriber.CallBack (*messages.RouterMessage,contextCancelFunc)
 	testCallback := func(message *messages.RouterMessage, ack context.CancelFunc) {
 		id := <-messageIdChan
-		log.Printf("want %v got %v", id, message.GetId())
-		log.Print(id != message.GetId())
+		// log.Printf("want %v got %v", id, message.GetId())
+		// log.Print(id != message.GetId())
 		if id != message.GetId() {
 			log.Printf("message id expected %v \n", messageId)
 			failCancel()
@@ -988,5 +995,97 @@ func TestDedicatedPublisher(t *testing.T) {
 	if route.Size() != 1 {
 		t.Errorf("test failed route size mismatch expected %v got %v ", 1, route.Size())
 		t.FailNow()
+	}
+}
+
+func TestPostAckHook(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := tinyQ.Router{}
+	t.Log("enabling hooks")
+	router.EnableHooks()
+	router.InitRouter()
+	t.Log("router start")
+	hookReturnChannel := make(chan *messages.RouterMessage, 1)
+	var hook1 hooks.Hook
+	testRouteKey := "testRoute"
+	hook1 = func(message *messages.RouterMessage) error {
+		hookReturnChannel <- message
+		return nil
+	}
+	router.RegisterRoute(testRouteKey, tinyQ.DefaultMaxRouteSize)
+	err := router.AddPostAckHook(testRouteKey, hook1)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	publisher := router.GetPublisher()
+	consumer := router.GetConsumer(testRouteKey)
+	route, _ := router.GetRoute(testRouteKey)
+	if route.HooksCount() != 1 {
+		t.Errorf("test failed route hooks count miss match wanted %v got %v", 1, route.HooksCount())
+		t.FailNow()
+	}
+	testMessage := []byte("test")
+	publisher.Publish(testMessage, testRouteKey)
+	msg, ok := receiveMessage(consumer)
+	if ok {
+		consumer.Ack(msg)
+		time.Sleep(time.Millisecond * 500)
+		if len(hookReturnChannel) != 1 {
+			t.Errorf("test failed return channel length miss match wanted %v got %v\n", 1, len(hookReturnChannel))
+			t.FailNow()
+		}
+		if string(msg.Content) == string(testMessage) {
+			hookMsg := <-hookReturnChannel
+			if string(hookMsg.Content) != string(testMessage) {
+				t.Errorf("test failed message content from return channel wanted %v got %v\n", string(testMessage), string(hookMsg.Content))
+				t.FailNow()
+			}
+		}
+	}
+}
+
+func TestPrePostHook(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := tinyQ.Router{}
+	t.Log("enabling hooks")
+	router.EnableHooks()
+	router.InitRouter()
+	t.Log("router start")
+	hookReturnChannel := make(chan *messages.RouterMessage, 1)
+	var hook1 hooks.Hook
+	testRouteKey := "testRoute"
+	hook1 = func(message *messages.RouterMessage) error {
+		t.Log("executing hook")
+		hookReturnChannel <- message
+		return nil
+	}
+	router.RegisterRoute(testRouteKey, tinyQ.DefaultMaxRouteSize)
+	err := router.AddMessagePostInHook(testRouteKey, hook1)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	publisher := router.GetPublisher()
+	consumer := router.GetConsumer(testRouteKey)
+	testMessage := []byte("test")
+	publisher.Publish(testMessage, testRouteKey)
+	msg, ok := receiveMessage(consumer)
+	if ok {
+		consumer.Ack(msg)
+		time.Sleep(time.Millisecond * 500)
+		if len(hookReturnChannel) != 1 {
+			t.Errorf("test failed return channel length miss match wanted %v got %v\n", 1, len(hookReturnChannel))
+			t.FailNow()
+		}
+		if string(msg.Content) == string(testMessage) {
+			hookMsg := <-hookReturnChannel
+			if string(hookMsg.Content) != string(testMessage) {
+				t.Errorf("test failed message content from return channel wanted %v got %v\n", string(testMessage), string(hookMsg.Content))
+				t.FailNow()
+			}
+		}
 	}
 }

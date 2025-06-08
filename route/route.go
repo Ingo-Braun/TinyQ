@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Ingo-Braun/TinyQ/hooks"
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 )
 
@@ -41,6 +42,11 @@ type Route struct {
 	RouterCloseCTX context.Context
 	// Size of the channel
 	ChanSize int
+
+	hookExecutor     *hooks.HookExecutor
+	hookInputChannel chan *Messages.RouterMessage
+	hooksEnabled     bool
+	hooksEnableMutex sync.Mutex
 }
 
 // validate and propagates the closing context of the Router
@@ -49,6 +55,9 @@ func (r *Route) checkIfRouterIsClosed() {
 	case <-r.RouterCloseCTX.Done():
 		r.CloseCancel()
 		r.WaitRoutineCancel()
+		if r.hooksEnabled {
+			r.hookExecutor.Stop()
+		}
 	default:
 		return
 	}
@@ -143,6 +152,13 @@ func (r *Route) Ack(consumerId string, messageId string) bool {
 	messageStorage, ok := r.awaitingMessages[messageId]
 	if ok && messageStorage.ConsumerId == consumerId {
 		messageStorage.Message.Ack()
+		r.hooksEnableMutex.Lock()
+		defer r.hooksEnableMutex.Unlock()
+		if r.hooksEnabled {
+			// make an copy of the message data
+			messageCopy := &messageStorage.Message
+			r.hookInputChannel <- *messageCopy
+		}
 		delete(r.awaitingMessages, messageId)
 		return true
 	}
@@ -175,6 +191,7 @@ func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *
 		CloseCancel:       closeCancel,
 		RouterCloseCTX:    routerCloseCTX,
 		ChanSize:          channelSize,
+		hooksEnabled:      false,
 	}
 	route.WaitRoutineCTX, route.WaitRoutineCancel = context.WithCancel(context.Background())
 	go route.watchTimedOutMessages()
@@ -202,4 +219,38 @@ func (r *Route) IsWaitingAck(messageId string) bool {
 	defer r.awaitingMessagesMutex.Unlock()
 	_, ok := r.awaitingMessages[messageId]
 	return ok
+}
+
+func (r *Route) IsHooksEnabled() bool {
+	r.hooksEnableMutex.Lock()
+	defer r.hooksEnableMutex.Unlock()
+	return r.hooksEnabled
+}
+
+// add an post acknowledge hook to execute
+// returns an error from hooks if fails
+// see hooks HooksExecutor.AddHook for an complete list
+func (r *Route) AddHook(hook hooks.Hook) error {
+	r.EnableHooks()
+	err := r.hookExecutor.AddHook(hook)
+	return err
+}
+
+func (r *Route) EnableHooks() {
+	r.hooksEnableMutex.Lock()
+	if !r.hooksEnabled {
+		r.hooksEnabled = true
+		r.hookExecutor = hooks.CreateHookExecutor(true)
+		r.hookExecutor.StartExecutor()
+		r.hookInputChannel = r.hookExecutor.GetInputChannel()
+	}
+	r.hooksEnableMutex.Unlock()
+}
+
+// return the number of registered hooks
+func (r *Route) HooksCount() int {
+	if r.hooksEnabled {
+		return r.hookExecutor.Count()
+	}
+	return -1
 }
