@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/Ingo-Braun/TinyQ/consumer"
+	"github.com/Ingo-Braun/TinyQ/hooks"
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 	DedicatedPublisher "github.com/Ingo-Braun/TinyQ/publishers/dedicated"
 	SimplePublisher "github.com/Ingo-Braun/TinyQ/publishers/simple"
@@ -25,6 +26,19 @@ const reDeliverCount int = 5
 // default maximum of messages in an Route
 const DefaultMaxRouteSize int = 300
 
+// default value for enabling hooks
+// this is only used when an defined hooksEnabled exists
+const DefaultHooksEnabled bool = false
+
+// Error thrown when attaching hook to an un-registered route
+var ErrorRouteToHookNotFound error = errors.New("error finding route to attach hook")
+
+// Error throw when attempting to register a hook when hooks are disabled
+var ErrorRouteHooksDisabled error = errors.New("error route hooks is disabled")
+
+// Error throw when attempting to register hooks after router is started
+var ErrorRouterStartedHook error = errors.New("error router is started, hooks cannot be enabled while running")
+
 // Main router, responsible to route messages into routes
 // call InitRouter to initialize the router
 // call StopRouter to stop the routing process WARNING this kills all routes and deletes all messages on the routes
@@ -38,15 +52,23 @@ type Router struct {
 	// Router re-send channel not used
 	ResendChannel chan *Messages.RouterMessage
 	// Router stop context
-	stopCTX          context.Context
-	stopCTXCancel    context.CancelFunc
-	odometer         bool
+	stopCTX       context.Context
+	stopCTXCancel context.CancelFunc
+	// Odometer flag
+	odometer bool
+
 	telemetryMutex   sync.Mutex
 	telemetry        *Telemetry
 	telemetryChannel chan Messages.TelemetryPackage
+	// flag if the router is started, used to prevent dangerous operations after the distribution routine is started
+	isStarted bool
+	// flag if hooks is enabled for this router
+	hooksEnabled        bool
+	hooksExecutors      map[string]*RouterHookExecutor
+	hooksExecutorsMutex sync.Mutex
 }
 
-// Ad-hoc message deliver delivery`s a message widout the need to use an publisher
+// Ad-hoc message deliver delivery`s a message without the need to use an publisher
 func (router *Router) deliverMessage(routerMessage *Messages.RouterMessage, destinationRoute *Route.Route) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
@@ -62,6 +84,15 @@ writeLoop:
 
 			if len(destinationRoute.Channel) < destinationRoute.ChanSize {
 				destinationRoute.Channel <- routerMessage
+				if router.hooksEnabled {
+					router.hooksExecutorsMutex.Lock()
+					routeHookExecutor, ok := router.hooksExecutors[routerMessage.Route]
+					if ok {
+						messageCopy := *routerMessage
+						routeHookExecutor.HookInputChannel <- &messageCopy
+					}
+					router.hooksExecutorsMutex.Unlock()
+				}
 				if router.odometer {
 					router.telemetryChannel <- Messages.TelemetryPackage{
 						Type:  Messages.TelemetryTypeMessagesProcessed,
@@ -75,7 +106,7 @@ writeLoop:
 }
 
 // Router worker to pass messages from the input channel to destination routes
-// messages with an invalid destination are discarted
+// messages with an invalid destination are discarded
 // this worker temporary locks the Routes map to deliver the message
 // this will try to deliver the message up to reDeliverCount (5)
 func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
@@ -104,7 +135,7 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 						Value: 1,
 					}
 				}
-				log.Printf("discarting message to route %v due not being registered\n", routerMessage.Route)
+				log.Printf("discarding message to route %v due not being registered\n", routerMessage.Route)
 			}
 			if router.odometer {
 				router.telemetryChannel <- Messages.TelemetryPackage{
@@ -112,20 +143,21 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 					Value: 1,
 				}
 			}
-			log.Println("discarting message due to max retries exceded")
+			log.Println("discarding message due to max retries exceeded")
 		}
 	}
 }
 
 // Initializes the router and start the router distribution worker
 // Call this BEFORE using anything from the router
-// NIL pointer exceptions will be rised if not called before use
+// NIL pointer exceptions will be raised if not called before use
 func (router *Router) InitRouter() {
 	log.Println("starting router")
 	router.RouterInput = make(chan *Messages.RouterMessage)
 	router.Routes = make(map[string]*Route.Route)
 	router.stopCTX, router.stopCTXCancel = context.WithCancel(context.Background())
 	go router.routerDistributionWorker(router.stopCTX)
+	router.isStarted = true
 	log.Println("router started")
 }
 
@@ -135,12 +167,14 @@ func (router *Router) InitRouter() {
 // consumers will be stopped
 func (router *Router) StopRouter() {
 	router.stopCTXCancel()
+
 }
 
 // Register a new route
 // Call this BEFORE publishing any message
 // Calling two times on same route key is fine
 func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
+
 	if !router.HasRoute(routeKey) {
 		router.routesMutex.Lock()
 		route, _ := Route.SetupRoute(router.stopCTX, routeMaxSize)
@@ -166,7 +200,7 @@ func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
 }
 
 // Creates and returns a new consumer to an route key
-// if an route does not exist creates one with DefaultMaxChanSize
+// if an route does not exist creates one with DefaultMaxChanSize and hooks DISABLED
 // Every consumer is thread safe
 // use as many as you need
 func (router *Router) GetConsumer(routeKey string) *consumer.Consumer {
@@ -191,7 +225,7 @@ func (router *Router) GetRoute(routeKey string) (*Route.Route, bool) {
 	return route, ok
 }
 
-// Creates and return a new publisher vinculated to this router
+// Creates and return a new publisher linked to this router
 // Every message published goes to the router input channel for distribution
 // Every publisher is thread safe
 // Use as many as you need
@@ -201,7 +235,7 @@ func (router *Router) GetPublisher() *SimplePublisher.SimplePublisher {
 	return &publisher
 }
 
-// Creates and return a new publisher vinculated to an specific route
+// Creates and return a new publisher linked to an specific route
 // Every message published goes to the router input channel for distribution
 // Every dedicated publisher is thread safe
 // Use as many as you need
@@ -246,6 +280,8 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 	return nil, false
 }
 
+// return an Telemetry object with the data collected from the router
+// Warning this function data is an snapshot of data
 func (router *Router) GetTelemetry() Telemetry {
 	router.telemetryMutex.Lock()
 	telemetryCopy := Telemetry{
@@ -258,6 +294,7 @@ func (router *Router) GetTelemetry() Telemetry {
 	return telemetryCopy
 }
 
+// telemetry routine to receive telemetry information from the distribution routine
 func (router *Router) telemetryProcessor() {
 	for {
 		select {
@@ -274,6 +311,8 @@ func (router *Router) telemetryProcessor() {
 	}
 }
 
+// enables telemetry data collection
+// for more information on what values are generated see Telemetry struct
 func (router *Router) EnableTelemetry() {
 	router.odometer = true
 	router.telemetry = GetNewTelemetry()
@@ -281,13 +320,77 @@ func (router *Router) EnableTelemetry() {
 	go router.telemetryProcessor()
 }
 
+// stops an specific route
+// WARNING this will cascade to all consumers and subscribers linked to this route
 func (router *Router) StopRoute(routeKey string) bool {
 	route, ok := router.GetRoute(routeKey)
 	if !ok {
 		return false
 	}
 	route.CloseRoute()
+	if router.hooksEnabled {
+		router.hooksExecutorsMutex.Lock()
+		defer router.hooksExecutorsMutex.Unlock()
+		executor, ok := router.hooksExecutors[routeKey]
+		if ok {
+			executor.HookExecutor.Stop()
+		}
+		delete(router.hooksExecutors, routeKey)
+	}
 	return true
+}
+
+// enables hooks
+// can only be called when router.InitRouter has been not called yet
+// returns ErrorRouterStartedHook when called after router start
+func (router *Router) EnableHooks() error {
+	if router.isStarted {
+		return ErrorRouterStartedHook
+	}
+	router.hooksEnabled = true
+	router.hooksExecutors = make(map[string]*RouterHookExecutor)
+	return nil
+}
+
+// returns if hooks are enabled
+func (router *Router) IsHooksEnabled() bool {
+	return router.hooksEnabled
+}
+
+// add hook to run after an message is acknowledged
+// enables hooks in route if hooks are enabled on the router
+// returns ErrorRouteToHookNotFound if an route is not found with the specified route key
+func (router *Router) AddPostAckHook(routeKey string, hook hooks.Hook) error {
+	if !router.hooksEnabled {
+		return ErrorRouteHooksDisabled
+	}
+	route, ok := router.GetRoute(routeKey)
+	if ok {
+		err := route.AddHook(hook)
+		return err
+
+	} else {
+		return ErrorRouteToHookNotFound
+	}
+
+}
+
+func (router *Router) AddMessagePostInHook(routeKey string, hook hooks.Hook) error {
+	if !router.HasRoute(routeKey) {
+		return ErrorRouteToHookNotFound
+	}
+	router.hooksExecutorsMutex.Lock()
+	defer router.hooksExecutorsMutex.Unlock()
+	routerExecutor, ok := router.hooksExecutors[routeKey]
+	if !ok {
+		routerExecutor = &RouterHookExecutor{}
+		routerExecutor.HookExecutor = hooks.CreateHookExecutor(true)
+		routerExecutor.HookInputChannel = routerExecutor.HookExecutor.GetInputChannel()
+		routerExecutor.HookExecutor.StartExecutor()
+		router.hooksExecutors[routeKey] = routerExecutor
+	}
+	routerExecutor.HookExecutor.AddHook(hook)
+	return nil
 }
 
 type Telemetry struct {
@@ -302,6 +405,8 @@ type Telemetry struct {
 	TotalReDelivered int64
 }
 
+// Telemetry generates and return an empty Telemetry object
+// Use router.GetTelemetry to get accurate telemetry data
 func GetNewTelemetry() *Telemetry {
 	return &Telemetry{
 		TotalMessages:    0,
@@ -311,6 +416,8 @@ func GetNewTelemetry() *Telemetry {
 	}
 }
 
+// function to update data on telemetry object
+// Use router.GetTelemetry to get accurate telemetry data
 func (t *Telemetry) UpdateTelemetry(telemetryData Messages.TelemetryPackage) {
 	switch telemetryData.Type {
 	case Messages.TelemetryTypeMessagesSent:
@@ -322,4 +429,9 @@ func (t *Telemetry) UpdateTelemetry(telemetryData Messages.TelemetryPackage) {
 	case Messages.TelemetryTypeMessagesResent:
 		t.TotalReDelivered += int64(telemetryData.Value)
 	}
+}
+
+type RouterHookExecutor struct {
+	HookExecutor     *hooks.HookExecutor
+	HookInputChannel hooks.HookChannel
 }

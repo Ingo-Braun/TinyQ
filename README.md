@@ -13,16 +13,17 @@
     4. [Creating Consumers and getting Messages](#creating-consumers-and-getting-messages)
     5. [Creating an Subscriber and Callback function](#creating-an-subscriber-and-callback-function)
 4. [Stopping](#stopping)
-
-5. [Components](#components)
+5. [Hooks](#hooks)
+6. [Telemetry](#telemetry)
+7. [Components](#components)
     - [Router](#router)
     - [Publisher](#publisher)
     - [Dedicated Publisher](#dedicated-publisher)
     - [Subscriber](#subscriber)
     - [Message](#message)
 
-6. [FAQ](#faq)
-7. [Motivation](#motivation)
+8. [FAQ](#faq)
+9. [Motivation](#motivation)
 
 ## Overview
 
@@ -142,6 +143,47 @@ If you call
     router.StopRouter()
 
 Every **Publisher**, **Route** and **Consumers and Subscribers** wil stop working and wil be safe to delete.
+
+## Hooks
+
+The router has an hooks engine, to enable call ```router.EnableHooks()```
+
+all hooks are executed in sequence in an dedicated routine
+
+all hooks DO NOT interfere on the original message life cycle, hooks are only for extra information's or notification
+
+WARNING NO HOOK is used to transform the message on the queue
+
+enable hooks BEFORE calling ```router.InitRouter()```
+
+### Pre-post-Hooks
+
+    Pre post Hooks are hooks executed just before an message is posted on the route
+
+### Post-Ack-Hooks
+
+    Post ACK Hooks are hooks executed after a message is acknowledge
+
+examples
+
+```go
+    func hook(message *Messages.RouterMessage) error {
+        fmt.Println(string(message.Content))
+        return nil
+    }
+
+    func main(){
+
+        router := tinyQ.Router{}
+        router.EnableHooks()
+        router.InitRouter()
+        testRouteKey := "testRoute"
+        router.RegisterRoute(testRouteKey, tinyQ.DefaultMaxRouteSize)
+        router.AddMessagePostInHook(hook,testRouteKey)
+
+    }
+
+```
 
 ## Telemetry
 
