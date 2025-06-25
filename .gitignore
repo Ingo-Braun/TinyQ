@@ -1,3 +1,5 @@
 */__pycache__
 tests_results.txt
 .vscode
+coverage.out
+coverage.html

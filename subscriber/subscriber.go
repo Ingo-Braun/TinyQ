@@ -70,8 +70,6 @@ func (s *Subscriber) Join() {
 		select {
 		case <-s.closeCTX.Done():
 			return
-		case <-s.closeCTX.Done():
-			return
 		default:
 			time.Sleep(time.Millisecond * 100)
 		}

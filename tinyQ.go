@@ -17,7 +17,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.10.1"
+const Version = "v0.10.2"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -186,10 +186,25 @@ func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
 // Removes an route
 // This will stop all consumers connected to this route and deletes all messages
 // Calling twice on same route key is fine
-func (router *Router) UnregisterRoute(routeKey string) {
+func (router *Router) UnregisterRoute(routeKey string) bool {
 	router.routesMutex.Lock()
-	delete(router.Routes, routeKey)
-	router.routesMutex.Unlock()
+	defer router.routesMutex.Unlock()
+	route, ok := router.Routes[routeKey]
+	if ok {
+		route.CloseRoute()
+		if router.hooksEnabled {
+			router.hooksExecutorsMutex.Lock()
+			defer router.hooksExecutorsMutex.Unlock()
+			executor, ok := router.hooksExecutors[routeKey]
+			if ok {
+				executor.HookExecutor.Stop()
+			}
+			delete(router.hooksExecutors, routeKey)
+		}
+		delete(router.Routes, routeKey)
+		return true
+	}
+	return false
 }
 
 // Returns the router input channel as an pointer
