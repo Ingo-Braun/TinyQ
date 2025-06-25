@@ -34,7 +34,7 @@ func (r *RouterMessage) GetId() string {
 // Stops the delivery timer
 func (r *RouterMessage) Ack() bool {
 	r.deliverCancel()
-	return r.deliverCTX.Err() == context.Canceled
+	return errors.Is(r.deliverCTX.Err(), context.Canceled)
 }
 
 // Returns if an message is valid

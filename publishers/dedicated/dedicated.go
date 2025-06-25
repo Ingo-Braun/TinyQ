@@ -2,7 +2,6 @@ package dedicated
 
 import (
 	"context"
-	"fmt"
 
 	Messages "github.com/Ingo-Braun/TinyQ/messages"
 	Route "github.com/Ingo-Braun/TinyQ/route"
@@ -50,6 +49,5 @@ func (pub *DedicatedPublisher) IsActive() bool {
 // if the route is not active than there is no reason this should be active
 // this is to keep consistency to other publishers
 func (pub *DedicatedPublisher) IsClosed() bool {
-	fmt.Println(pub.route.IsClosed())
 	return pub.route.IsClosed()
 }

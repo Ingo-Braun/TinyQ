@@ -998,6 +998,29 @@ func TestDedicatedPublisher(t *testing.T) {
 	}
 }
 
+func TestHooksEnable(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := tinyQ.Router{}
+	err := router.EnableHooks()
+	if err != nil {
+		t.Errorf("test failed enabling hooks returned error %v \n", err)
+	}
+	router.InitRouter()
+}
+
+func TestHooksEnableAfterInit(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := tinyQ.Router{}
+	router.InitRouter()
+	err := router.EnableHooks()
+	if err == nil {
+		t.Error("test failed EnableHooks should return error on call after init, returned nil")
+		t.FailNow()
+	}
+}
+
 func TestPostAckHook(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1046,6 +1069,24 @@ func TestPostAckHook(t *testing.T) {
 	}
 }
 
+func TestPostAckHookUnregisteredRoute(t *testing.T) {
+	t.Parallel()
+	router := tinyQ.Router{}
+	router.EnableHooks()
+	router.InitRouter()
+	defer router.StopRouter()
+	hook := func(message *messages.RouterMessage) error {
+		t.Log("executing hook")
+		return nil
+	}
+	err := router.AddPostAckHook("test", hook)
+	if err == nil {
+		t.Error("test failed error is nil")
+		t.FailNow()
+	}
+
+}
+
 func TestPrePostHook(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1089,3 +1130,119 @@ func TestPrePostHook(t *testing.T) {
 		}
 	}
 }
+
+func TestPrePostHookUnregisteredRoute(t *testing.T) {
+	t.Parallel()
+	router := tinyQ.Router{}
+	router.EnableHooks()
+	router.InitRouter()
+	defer router.StopRouter()
+	hook := func(message *messages.RouterMessage) error {
+		t.Log("executing hook")
+		return nil
+	}
+	err := router.AddMessagePostInHook("test", hook)
+	if err == nil {
+		t.Error("test failed error is nil")
+		t.FailNow()
+	}
+}
+
+func TestUnregisterRoute(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := startRouter()
+	testRoute := "test"
+	router.RegisterRoute(testRoute, tinyQ.DefaultMaxRouteSize)
+	router.UnregisterRoute(testRoute)
+	if router.HasRoute(testRoute) {
+		t.Error("test failed router still has route")
+		t.FailNow()
+	}
+}
+
+func TestUnregisterRouteWithHooks(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := tinyQ.Router{}
+	router.EnableHooks()
+	router.InitRouter()
+	testRoute := "test"
+	router.RegisterRoute(testRoute, tinyQ.DefaultMaxRouteSize)
+	router.UnregisterRoute(testRoute)
+	if router.HasRoute(testRoute) {
+		t.Error("test failed router still has route")
+		t.FailNow()
+	}
+}
+
+func TestStopRoute(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := startRouter()
+	testRoute := "test"
+	router.RegisterRoute(testRoute, tinyQ.DefaultMaxRouteSize)
+	route, _ := router.GetRoute(testRoute)
+	router.StopRoute(testRoute)
+	if !route.IsClosed() {
+		t.Error("test failed route is still running")
+		t.FailNow()
+	}
+}
+
+func TestStopRouteWithHooks(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := tinyQ.Router{}
+	router.EnableHooks()
+	router.InitRouter()
+	testRoute := "test"
+	router.RegisterRoute(testRoute, tinyQ.DefaultMaxRouteSize)
+	route, _ := router.GetRoute(testRoute)
+	router.StopRoute(testRoute)
+	if !route.IsClosed() {
+		t.Error("test failed route is still running")
+		t.FailNow()
+	}
+}
+
+func TestStopRouteNotRegistered(t *testing.T) {
+	t.Parallel()
+	t.Log("starting router")
+	router := startRouter()
+	testRoute := "test"
+	resp := router.StopRoute(testRoute)
+	if resp {
+		t.Error("test failed route stop should return false to unregistered routes")
+	}
+}
+
+// func TestRouteOverwhelm(t *testing.T) {
+// 	t.Log("starting router")
+// 	router := startRouter()
+// 	defer router.StopRouter()
+// 	router.EnableTelemetry()
+// 	router.RegisterRoute("test", 5)
+// 	publisher := router.GetPublisher()
+// 	stop, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+// 	defer cancel()
+// 	go func() {
+// 	feedLoop:
+// 		for {
+// 			select {
+// 			case <-stop.Done():
+// 				break feedLoop
+// 			default:
+// 				t.Log("published")
+// 				publisher.Publish([]byte("msg"), "test")
+// 			}
+// 		}
+// 	}()
+// 	<-stop.Done()
+// 	time.Sleep(time.Second * 100)
+// 	telemetry := router.GetTelemetry()
+// 	if telemetry.TotalLost == 0 {
+// 		t.Errorf("test failed total messages lost mismatch expected %v got %v \n", "!0", telemetry.TotalLost)
+// 		t.FailNow()
+// 	}
+// }
