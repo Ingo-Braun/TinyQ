@@ -17,7 +17,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.10.2"
+const Version = "v0.10.3"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -167,7 +167,6 @@ func (router *Router) InitRouter() {
 // consumers will be stopped
 func (router *Router) StopRouter() {
 	router.stopCTXCancel()
-
 }
 
 // Register a new route
@@ -175,11 +174,17 @@ func (router *Router) StopRouter() {
 // Calling two times on same route key is fine
 func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
 
-	if !router.HasRoute(routeKey) {
-		router.routesMutex.Lock()
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	router.registerRoute(routeKey, routeMaxSize)
+}
+
+// performs the register route unsafe
+// DO NOT CALL this if routesMutex lock is not acquired
+func (router *Router) registerRoute(routeKey string, routeMaxSize int) {
+	if !router.hasRoute(routeKey) {
 		route, _ := Route.SetupRoute(router.stopCTX, routeMaxSize)
 		router.Routes[routeKey] = route
-		router.routesMutex.Unlock()
 	}
 }
 
@@ -220,8 +225,10 @@ func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
 // use as many as you need
 func (router *Router) GetConsumer(routeKey string) *consumer.Consumer {
 	consumer := consumer.Consumer{}
-	if !router.HasRoute(routeKey) {
-		router.RegisterRoute(routeKey, DefaultMaxRouteSize)
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	if !router.hasRoute(routeKey) {
+		router.registerRoute(routeKey, DefaultMaxRouteSize)
 	}
 	route, ok := router.GetRoute(routeKey)
 	if ok {
@@ -235,8 +242,15 @@ func (router *Router) GetConsumer(routeKey string) *consumer.Consumer {
 // Use with caution
 func (router *Router) GetRoute(routeKey string) (*Route.Route, bool) {
 	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	route, ok := router.getRoute(routeKey)
+	return route, ok
+}
+
+// performs the get route unsafe
+// DO NOT CALL this if routesMutex lock is not acquired
+func (router *Router) getRoute(routeKey string) (*Route.Route, bool) {
 	route, ok := router.Routes[routeKey]
-	router.routesMutex.Unlock()
 	return route, ok
 }
 
@@ -256,9 +270,11 @@ func (router *Router) GetPublisher() *SimplePublisher.SimplePublisher {
 // Use as many as you need
 // returns nil if failed to get the route with the routing key
 func (router *Router) GetDedicatedPublisher(routeKey string) *DedicatedPublisher.DedicatedPublisher {
-	if router.HasRoute(routeKey) {
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	if router.hasRoute(routeKey) {
 		publisher := DedicatedPublisher.DedicatedPublisher{}
-		route, ok := router.GetRoute(routeKey)
+		route, ok := router.getRoute(routeKey)
 		if !ok {
 			return nil
 		}
@@ -272,8 +288,15 @@ func (router *Router) GetDedicatedPublisher(routeKey string) *DedicatedPublisher
 // This locks the Routes map to get the answer
 func (router *Router) HasRoute(routeKey string) bool {
 	router.routesMutex.Lock()
-	_, ok := router.Routes[routeKey]
+	ok := router.hasRoute(routeKey)
 	router.routesMutex.Unlock()
+	return ok
+}
+
+// performs the has route check unsafe
+// DO NOT CALL this if routesMutex lock is not acquired
+func (router *Router) hasRoute(routeKey string) bool {
+	_, ok := router.Routes[routeKey]
 	return ok
 }
 
@@ -283,9 +306,11 @@ func (router *Router) IsRunning() bool {
 }
 
 func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBack) (*Subscriber.Subscriber, bool) {
-	if router.HasRoute(routeKey) {
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	if router.hasRoute(routeKey) {
 		subscriber := Subscriber.Subscriber{}
-		route, ok := router.GetRoute(routeKey)
+		route, ok := router.getRoute(routeKey)
 		if !ok {
 			return nil, false
 		}
@@ -319,8 +344,7 @@ func (router *Router) telemetryProcessor() {
 			router.telemetryMutex.Lock()
 			router.telemetry.UpdateTelemetry(telemetryMessage)
 			router.telemetryMutex.Unlock()
-		default:
-			time.Sleep(time.Millisecond * 10)
+
 		}
 
 	}
@@ -331,14 +355,16 @@ func (router *Router) telemetryProcessor() {
 func (router *Router) EnableTelemetry() {
 	router.odometer = true
 	router.telemetry = GetNewTelemetry()
-	router.telemetryChannel = make(chan Messages.TelemetryPackage, 1000)
+	router.telemetryChannel = make(chan Messages.TelemetryPackage, 1000000)
 	go router.telemetryProcessor()
 }
 
 // stops an specific route
 // WARNING this will cascade to all consumers and subscribers linked to this route
 func (router *Router) StopRoute(routeKey string) bool {
-	route, ok := router.GetRoute(routeKey)
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	route, ok := router.getRoute(routeKey)
 	if !ok {
 		return false
 	}
@@ -379,7 +405,9 @@ func (router *Router) AddPostAckHook(routeKey string, hook hooks.Hook) error {
 	if !router.hooksEnabled {
 		return ErrorRouteHooksDisabled
 	}
-	route, ok := router.GetRoute(routeKey)
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
+	route, ok := router.getRoute(routeKey)
 	if ok {
 		err := route.AddHook(hook)
 		return err
@@ -391,9 +419,12 @@ func (router *Router) AddPostAckHook(routeKey string, hook hooks.Hook) error {
 }
 
 func (router *Router) AddMessagePostInHook(routeKey string, hook hooks.Hook) error {
+	router.routesMutex.Lock()
+	defer router.routesMutex.Unlock()
 	if !router.HasRoute(routeKey) {
 		return ErrorRouteToHookNotFound
 	}
+	router.routesMutex.Unlock()
 	router.hooksExecutorsMutex.Lock()
 	defer router.hooksExecutorsMutex.Unlock()
 	routerExecutor, ok := router.hooksExecutors[routeKey]
