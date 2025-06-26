@@ -124,11 +124,14 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 				}
 			}
 			if routerMessage.RetrySend < reDeliverCount {
-				destinationRoute, ok := router.GetRoute(routerMessage.Route)
+				router.routesMutex.Lock()
+				destinationRoute, ok := router.getRoute(routerMessage.Route)
 				if ok {
 					router.deliverMessage(routerMessage, destinationRoute)
+					router.routesMutex.Unlock()
 					continue
 				}
+				router.routesMutex.Unlock()
 				if router.odometer {
 					router.telemetryChannel <- Messages.TelemetryPackage{
 						Type:  Messages.TelemetryTypeMessagesResent,
@@ -230,7 +233,7 @@ func (router *Router) GetConsumer(routeKey string) *consumer.Consumer {
 	if !router.hasRoute(routeKey) {
 		router.registerRoute(routeKey, DefaultMaxRouteSize)
 	}
-	route, ok := router.GetRoute(routeKey)
+	route, ok := router.getRoute(routeKey)
 	if ok {
 		consumer.Setup(route)
 		return &consumer
@@ -421,7 +424,7 @@ func (router *Router) AddPostAckHook(routeKey string, hook hooks.Hook) error {
 func (router *Router) AddMessagePostInHook(routeKey string, hook hooks.Hook) error {
 	router.routesMutex.Lock()
 	defer router.routesMutex.Unlock()
-	if !router.HasRoute(routeKey) {
+	if !router.hasRoute(routeKey) {
 		return ErrorRouteToHookNotFound
 	}
 	router.routesMutex.Unlock()
