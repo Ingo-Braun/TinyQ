@@ -17,7 +17,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.10.3"
+const Version = "v0.10.4-preview"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -46,7 +46,7 @@ type Router struct {
 	// Routing map used to store all known routes [routeKey]*Route
 	Routes map[string]*Route.Route
 	// Routing map mutex
-	routesMutex sync.Mutex
+	routesMutex sync.RWMutex
 	// Router input channel - where the messages come
 	RouterInput chan *Messages.RouterMessage
 	// Router re-send channel not used
@@ -124,14 +124,14 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 				}
 			}
 			if routerMessage.RetrySend < reDeliverCount {
-				router.routesMutex.Lock()
+				router.routesMutex.RLock()
 				destinationRoute, ok := router.getRoute(routerMessage.Route)
 				if ok {
 					router.deliverMessage(routerMessage, destinationRoute)
-					router.routesMutex.Unlock()
+					router.routesMutex.RUnlock()
 					continue
 				}
-				router.routesMutex.Unlock()
+				router.routesMutex.RUnlock()
 				if router.odometer {
 					router.telemetryChannel <- Messages.TelemetryPackage{
 						Type:  Messages.TelemetryTypeMessagesResent,
@@ -290,15 +290,16 @@ func (router *Router) GetDedicatedPublisher(routeKey string) *DedicatedPublisher
 // Checks if the router has an route with that route key
 // This locks the Routes map to get the answer
 func (router *Router) HasRoute(routeKey string) bool {
-	router.routesMutex.Lock()
+	router.routesMutex.RLock()
 	ok := router.hasRoute(routeKey)
-	router.routesMutex.Unlock()
+	router.routesMutex.RUnlock()
 	return ok
 }
 
 // performs the has route check unsafe
 // DO NOT CALL this if routesMutex lock is not acquired
 func (router *Router) hasRoute(routeKey string) bool {
+
 	_, ok := router.Routes[routeKey]
 	return ok
 }
@@ -423,8 +424,8 @@ func (router *Router) AddPostAckHook(routeKey string, hook hooks.Hook) error {
 
 func (router *Router) AddMessagePostInHook(routeKey string, hook hooks.Hook) error {
 	router.routesMutex.Lock()
-	defer router.routesMutex.Unlock()
 	if !router.hasRoute(routeKey) {
+		router.routesMutex.Unlock()
 		return ErrorRouteToHookNotFound
 	}
 	router.routesMutex.Unlock()
