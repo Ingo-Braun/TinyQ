@@ -261,8 +261,8 @@ func TestAck(t *testing.T) {
 		t.Logf("is message expired %v", message.IsExpired())
 		t.Logf("is message valid %v", message.IsValid())
 		if message.IsExpired() == false && message.IsValid() {
-			err := consumer.Ack(message)
-			if !err {
+			ok := consumer.Ack(message)
+			if !ok {
 				t.FailNow()
 			}
 			route, _ := router.GetRoute("test")
@@ -682,7 +682,7 @@ func TestMultiReceive(t *testing.T) {
 
 	// starting context to initiate all consumer routines at the same time
 	startCtx, start := context.WithCancel(context.Background())
-	for workerId := range 3 {
+	for workerId := range 30 {
 		go func() {
 			t.Logf("worker %v is online\n", workerId)
 			consumer := router.GetConsumer("test")
@@ -998,17 +998,27 @@ func TestDedicatedPublisher(t *testing.T) {
 	}
 }
 
+// Test Enabling hooks
+// fails if EnableHooks returns an error
+// fails if hooks were enabled while router is started
+// fails if returned error is not ErrorRouteHooksDisabled
 func TestHooksEnable(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
 	router := tinyQ.Router{}
 	err := router.EnableHooks()
-	if err != nil {
+	if errors.Is(err, tinyQ.ErrorRouteHooksDisabled) {
 		t.Errorf("test failed enabling hooks returned error %v \n", err)
+		t.FailNow()
+	} else if !errors.Is(err, tinyQ.ErrorRouteHooksDisabled) && err != nil {
+		t.Errorf("test failed returned error is not ErrorRouteHooksDisabled received %v \n", err)
+		t.FailNow()
 	}
 	router.InitRouter()
 }
 
+// Test enabling hooks after router init
+// fails if EnableHooks returns nil
 func TestHooksEnableAfterInit(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1021,7 +1031,11 @@ func TestHooksEnableAfterInit(t *testing.T) {
 	}
 }
 
+// Tests post ack hooks
+// fails if hooks count not equals to 1
+// fails if hook message is different from original
 func TestPostAckHook(t *testing.T) {
+	// setup
 	t.Parallel()
 	t.Log("starting router")
 	router := tinyQ.Router{}
@@ -1029,26 +1043,32 @@ func TestPostAckHook(t *testing.T) {
 	router.EnableHooks()
 	router.InitRouter()
 	t.Log("router start")
+	// message return channel
 	hookReturnChannel := make(chan *messages.RouterMessage, 1)
 	var hook1 hooks.Hook
 	testRouteKey := "testRoute"
+
 	hook1 = func(message *messages.RouterMessage) error {
 		hookReturnChannel <- message
 		return nil
 	}
+
 	router.RegisterRoute(testRouteKey, tinyQ.DefaultMaxRouteSize)
 	err := router.AddPostAckHook(testRouteKey, hook1)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
+
 	publisher := router.GetPublisher()
 	consumer := router.GetConsumer(testRouteKey)
 	route, _ := router.GetRoute(testRouteKey)
+
 	if route.HooksCount() != 1 {
 		t.Errorf("test failed route hooks count miss match wanted %v got %v", 1, route.HooksCount())
 		t.FailNow()
 	}
+
 	testMessage := []byte("test")
 	publisher.Publish(testMessage, testRouteKey)
 	msg, ok := receiveMessage(consumer)
@@ -1069,6 +1089,8 @@ func TestPostAckHook(t *testing.T) {
 	}
 }
 
+// Test post ack hook to an unregistered route
+// fails if AddPostAckHook returns nil
 func TestPostAckHookUnregisteredRoute(t *testing.T) {
 	t.Parallel()
 	router := tinyQ.Router{}
@@ -1087,6 +1109,9 @@ func TestPostAckHookUnregisteredRoute(t *testing.T) {
 
 }
 
+// Tests pre post hooks
+// fails if hooks count not equals to 1
+// fails if hook message is different from original
 func TestPrePostHook(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1106,7 +1131,7 @@ func TestPrePostHook(t *testing.T) {
 	router.RegisterRoute(testRouteKey, tinyQ.DefaultMaxRouteSize)
 	err := router.AddMessagePostInHook(testRouteKey, hook1)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("Test failed AddMessagePostInHook returned error %v \n", err)
 		t.FailNow()
 	}
 	publisher := router.GetPublisher()
@@ -1131,6 +1156,8 @@ func TestPrePostHook(t *testing.T) {
 	}
 }
 
+// Test pre post hook to an unregistered route
+// fails if AddPostAckHook returns nil
 func TestPrePostHookUnregisteredRoute(t *testing.T) {
 	t.Parallel()
 	router := tinyQ.Router{}
@@ -1148,6 +1175,8 @@ func TestPrePostHookUnregisteredRoute(t *testing.T) {
 	}
 }
 
+// Test unregister an route
+// fails if router still has the route
 func TestUnregisterRoute(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1161,6 +1190,8 @@ func TestUnregisterRoute(t *testing.T) {
 	}
 }
 
+// Test unregister route that has hooks
+// fails if router still has route
 func TestUnregisterRouteWithHooks(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1176,6 +1207,8 @@ func TestUnregisterRouteWithHooks(t *testing.T) {
 	}
 }
 
+// Test stopping an route
+// fails if route is running after StopRoute is called
 func TestStopRoute(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1190,6 +1223,8 @@ func TestStopRoute(t *testing.T) {
 	}
 }
 
+// Test stopping route with hooks
+// fails if route is running after StopRoute is called
 func TestStopRouteWithHooks(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1206,6 +1241,8 @@ func TestStopRouteWithHooks(t *testing.T) {
 	}
 }
 
+// Test stop route on inexistent route
+// fails if router acknowledges stopping non existent route
 func TestStopRouteNotRegistered(t *testing.T) {
 	t.Parallel()
 	t.Log("starting router")
@@ -1216,6 +1253,50 @@ func TestStopRouteNotRegistered(t *testing.T) {
 		t.Error("test failed route stop should return false to unregistered routes")
 	}
 }
+
+// // Test multiple routes ad once
+// //
+// func TestMultipleRouteOps(t *testing.T) {
+// 	t.Log("starting router")
+// 	router := startRouter()
+// 	defer router.StopRouter()
+// 	startCTX, start := context.WithCancel(context.Background())
+// 	stopCTX, stop := context.WithCancel(context.Background())
+// 	nameChannel := make(chan string, 30)
+// 	creator := func(startCTX context.Context, stopCTX context.Context, nameChan chan string, workerId int) {
+// 		<-startCTX.Done()
+// 		c := 0
+// 		for {
+// 			select {
+// 			case <-stopCTX.Done():
+// 				return
+// 			default:
+// 				name := fmt.Sprintf("worker %v route %v", workerId, c)
+// 				router.RegisterRoute(name, 4)
+// 			}
+// 		}
+// 	}
+
+// 	closer := func(startCTX context.Context, stopCTX context.Context, nameChan chan string) {
+// 		<-startCTX.Done()
+// 		for {
+// 			select {
+// 			case <-stopCTX.Done():
+// 				return
+// 			case name := <-nameChan:
+// 				router.UnregisterRoute(name)
+// 			}
+// 		}
+// 	}
+
+// 	for i := range 5 {
+// 		go creator(startCTX, stopCTX, nameChannel, i)
+// 		go closer(startCTX, stopCTX, nameChannel)
+// 	}
+// 	start()
+// 	time.Sleep(time.Second * 10)
+// 	stop()
+// }
 
 // func TestRouteOverwhelm(t *testing.T) {
 // 	t.Log("starting router")
