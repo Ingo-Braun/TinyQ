@@ -16,7 +16,7 @@ import (
 const MessageRetrievalTimeout = 200
 
 type Consumer struct {
-	// Consumer id used to check responsability on message ack
+	// Consumer id used to check responsibility on message ack
 	id string
 	// Route linked to this consumer
 	route *Route.Route
