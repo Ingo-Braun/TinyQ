@@ -851,6 +851,7 @@ func TestOdometer(t *testing.T) {
 
 	if telemetry.TotalQueuesRegistered != 1 {
 		t.Errorf("failed counting total queues")
+		t.Errorf("total Queues %v", telemetry.TotalQueuesRegistered)
 		t.FailNow()
 	}
 

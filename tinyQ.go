@@ -17,7 +17,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.11.0"
+const Version = "v0.11.1"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -180,12 +180,6 @@ func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
 	router.routesMutex.Lock()
 	defer router.routesMutex.Unlock()
 	router.registerRoute(routeKey, routeMaxSize)
-	if router.odometer {
-		router.telemetryChannel <- Messages.TelemetryPackage{
-			Type:  Messages.TelemetryTypeQueueRegister,
-			Value: 1,
-		}
-	}
 }
 
 // performs the register route unsafe
@@ -194,6 +188,12 @@ func (router *Router) registerRoute(routeKey string, routeMaxSize int) {
 	if !router.hasRoute(routeKey) {
 		route, _ := Route.SetupRoute(router.stopCTX, routeMaxSize)
 		router.Routes[routeKey] = route
+		if router.odometer {
+			router.telemetryChannel <- Messages.TelemetryPackage{
+				Type:  Messages.TelemetryTypeQueueRegister,
+				Value: 1,
+			}
+		}
 	}
 }
 
@@ -347,10 +347,11 @@ func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBac
 func (router *Router) GetTelemetry() Telemetry {
 	router.telemetryMutex.Lock()
 	telemetryCopy := Telemetry{
-		TotalMessages:    router.telemetry.TotalMessages,
-		TotalDelivered:   router.telemetry.TotalDelivered,
-		TotalLost:        router.telemetry.TotalLost,
-		TotalReDelivered: router.telemetry.TotalReDelivered,
+		TotalMessages:         router.telemetry.TotalMessages,
+		TotalDelivered:        router.telemetry.TotalDelivered,
+		TotalLost:             router.telemetry.TotalLost,
+		TotalReDelivered:      router.telemetry.TotalReDelivered,
+		TotalQueuesRegistered: router.telemetry.TotalQueuesRegistered,
 	}
 	router.telemetryMutex.Unlock()
 	return telemetryCopy
@@ -378,6 +379,12 @@ func (router *Router) EnableTelemetry() {
 	router.odometer = true
 	router.telemetry = GetNewTelemetry()
 	router.telemetryChannel = make(chan Messages.TelemetryPackage, 1000000)
+	router.routesMutex.Lock()
+	router.telemetryChannel <- Messages.TelemetryPackage{
+		Type:  Messages.TelemetryTypeQueueUpdate,
+		Value: len(router.Routes),
+	}
+	router.routesMutex.Unlock()
 	go router.telemetryProcessor()
 }
 
@@ -509,6 +516,8 @@ func (t *Telemetry) UpdateTelemetry(telemetryData Messages.TelemetryPackage) {
 		t.TotalQueuesRegistered += int64(telemetryData.Value)
 	case Messages.TelemetryTypeQueueUnregister:
 		t.TotalQueuesRegistered -= int64(telemetryData.Value)
+	case Messages.TelemetryTypeQueueUpdate:
+		t.TotalQueuesRegistered = int64(telemetryData.Value)
 	}
 
 }
