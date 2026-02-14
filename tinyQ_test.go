@@ -849,6 +849,11 @@ func TestOdometer(t *testing.T) {
 		t.FailNow()
 	}
 
+	if telemetry.TotalQueuesRegistered != 1 {
+		t.Errorf("failed counting total queues")
+		t.FailNow()
+	}
+
 }
 
 // Test if an Route is closed other routes keep working and the consumers attached to that route also stops
@@ -1254,7 +1259,7 @@ func TestStopRouteNotRegistered(t *testing.T) {
 	}
 }
 
-// // Test multiple routes ad once
+// // Test multiple routes at once
 // //
 // func TestMultipleRouteOps(t *testing.T) {
 // 	t.Log("starting router")

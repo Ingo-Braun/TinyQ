@@ -17,7 +17,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.10.4-preview"
+const Version = "v0.11.0"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -180,6 +180,12 @@ func (router *Router) RegisterRoute(routeKey string, routeMaxSize int) {
 	router.routesMutex.Lock()
 	defer router.routesMutex.Unlock()
 	router.registerRoute(routeKey, routeMaxSize)
+	if router.odometer {
+		router.telemetryChannel <- Messages.TelemetryPackage{
+			Type:  Messages.TelemetryTypeQueueRegister,
+			Value: 1,
+		}
+	}
 }
 
 // performs the register route unsafe
@@ -208,8 +214,20 @@ func (router *Router) UnregisterRoute(routeKey string) bool {
 				executor.HookExecutor.Stop()
 			}
 			delete(router.hooksExecutors, routeKey)
+			if router.odometer {
+				router.telemetryChannel <- Messages.TelemetryPackage{
+					Type:  Messages.TelemetryTypeHookUnregister,
+					Value: 1,
+				}
+			}
 		}
 		delete(router.Routes, routeKey)
+		if router.odometer {
+			router.telemetryChannel <- Messages.TelemetryPackage{
+				Type:  Messages.TelemetryTypeQueueUnregister,
+				Value: 1,
+			}
+		}
 		return true
 	}
 	return false
@@ -440,6 +458,12 @@ func (router *Router) AddMessagePostInHook(routeKey string, hook hooks.Hook) err
 		router.hooksExecutors[routeKey] = routerExecutor
 	}
 	routerExecutor.HookExecutor.AddHook(hook)
+	if router.odometer {
+		router.telemetryChannel <- Messages.TelemetryPackage{
+			Type:  Messages.TelemetryTypeHookRegister,
+			Value: 1,
+		}
+	}
 	return nil
 }
 
@@ -453,16 +477,19 @@ type Telemetry struct {
 	TotalLost int64
 	// Total redelivery attempts
 	TotalReDelivered int64
+	// Total Queues registered
+	TotalQueuesRegistered int64
 }
 
 // Telemetry generates and return an empty Telemetry object
 // Use router.GetTelemetry to get accurate telemetry data
 func GetNewTelemetry() *Telemetry {
 	return &Telemetry{
-		TotalMessages:    0,
-		TotalDelivered:   0,
-		TotalLost:        0,
-		TotalReDelivered: 0,
+		TotalMessages:         0,
+		TotalDelivered:        0,
+		TotalLost:             0,
+		TotalReDelivered:      0,
+		TotalQueuesRegistered: 0,
 	}
 }
 
@@ -478,7 +505,12 @@ func (t *Telemetry) UpdateTelemetry(telemetryData Messages.TelemetryPackage) {
 		t.TotalLost += int64(telemetryData.Value)
 	case Messages.TelemetryTypeMessagesResent:
 		t.TotalReDelivered += int64(telemetryData.Value)
+	case Messages.TelemetryTypeQueueRegister:
+		t.TotalQueuesRegistered += int64(telemetryData.Value)
+	case Messages.TelemetryTypeQueueUnregister:
+		t.TotalQueuesRegistered -= int64(telemetryData.Value)
 	}
+
 }
 
 type RouterHookExecutor struct {
