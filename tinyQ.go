@@ -17,7 +17,7 @@ import (
 	Subscriber "github.com/Ingo-Braun/TinyQ/subscriber"
 )
 
-const Version = "v0.11.1"
+const Version = "v0.11.2"
 
 // N times witch the router will try to deliver
 // TODO: allow retry count as an configurable variable
@@ -25,6 +25,9 @@ const reDeliverCount int = 5
 
 // default maximum of messages in an Route
 const DefaultMaxRouteSize int = 300
+
+// default telemetry input channel size
+const DefaultTelemetryChanSize int = 200
 
 // default value for enabling hooks
 // this is only used when an defined hooksEnabled exists
@@ -378,7 +381,7 @@ func (router *Router) telemetryProcessor() {
 func (router *Router) EnableTelemetry() {
 	router.odometer = true
 	router.telemetry = GetNewTelemetry()
-	router.telemetryChannel = make(chan Messages.TelemetryPackage, 1000000)
+	router.telemetryChannel = make(chan Messages.TelemetryPackage, DefaultTelemetryChanSize)
 	router.routesMutex.Lock()
 	router.telemetryChannel <- Messages.TelemetryPackage{
 		Type:  Messages.TelemetryTypeQueueUpdate,
