@@ -330,6 +330,12 @@ func (router *Router) IsRunning() bool {
 	return !errors.Is(router.stopCTX.Err(), context.Canceled)
 }
 
+// return a new Subscriber linked to a route
+// routeKey registered route key
+// callBack function of type Subscriber.CallBack
+// returns *Subscriber.Subscriber or nil on error
+// returns true if subscriber is correctly created
+// returns false in case of route key not found
 func (router *Router) GetSubscriber(routeKey string, callBack Subscriber.CallBack) (*Subscriber.Subscriber, bool) {
 	router.routesMutex.Lock()
 	defer router.routesMutex.Unlock()

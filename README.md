@@ -201,8 +201,10 @@ func main(){
     telemetry.TotalDelivered
     telemetry.TotalLost
     telemetry.TotalReDelivered
+    telemetry.TotalQueuesRegistered
 }
 ```
+
 Every time you call router.GetTelemetry() an copy of the values of the internal telemetry data is returned, it is an photo of the data.
 
 ## Components
