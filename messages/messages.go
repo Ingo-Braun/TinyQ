@@ -73,16 +73,16 @@ func CreateMessage(content []byte, routeKey string) *RouterMessage {
 }
 
 type TelemetryPackage struct {
-	Type  string
+	Type  int8
 	Value int
 }
 
-const TelemetryTypeMessagesSent string = "Sent"
-const TelemetryTypeMessagesProcessed string = "Processed"
-const TelemetryTypeMessagesDiscarded string = "Discarded"
-const TelemetryTypeMessagesResent string = "Resent"
-const TelemetryTypeQueueRegister string = "QueueRegister"
-const TelemetryTypeQueueUnregister string = "QueueUnRegister"
-const TelemetryTypeQueueUpdate string = "QueueUpdate"
-const TelemetryTypeHookRegister string = "HookRegister"
-const TelemetryTypeHookUnregister string = "HookUnregister"
+const TelemetryTypeMessagesSent int8 = 0
+const TelemetryTypeMessagesProcessed int8 = 1
+const TelemetryTypeMessagesDiscarded int8 = 2
+const TelemetryTypeMessagesResent int8 = 3
+const TelemetryTypeQueueRegister int8 = 4
+const TelemetryTypeQueueUnregister int8 = 5
+const TelemetryTypeQueueUpdate int8 = 6
+const TelemetryTypeHookRegister int8 = 7
+const TelemetryTypeHookUnregister int8 = 8
