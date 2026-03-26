@@ -22,7 +22,7 @@ func startRouter() *tinyQ.Router {
 	return &router
 }
 
-// helper function to get messages from an consumer
+// helper function to get messages from a consumer
 // consumer should timeout before
 func receiveMessage(consumer *consumer.Consumer) (*messages.RouterMessage, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*2000)
@@ -125,7 +125,7 @@ func TestCreateBasicConsumerNotRegisteredRoute(t *testing.T) {
 // fails if there is an failure in delivering the message
 // fails if the route size is 0
 // the reading of the Route size is reliable due to not having an consumer attached to it
-func TestSend(t *testing.T) {
+func TestPublish(t *testing.T) {
 	// setup
 	t.Log("starting router")
 	router := startRouter()
@@ -322,11 +322,79 @@ func TestNotAck(t *testing.T) {
 	}
 }
 
+// Tests Fan Publish
+// Fails if Fan Publishing returns false
+// Fails if length of published messages is different of length routes
+// Fails if returned any message id of published ids is ""
+// Fails if message never arrives at destination route
+// Fails if received message id is different from published id
+// Fails if received message content is null or differs from published content
+func TestFanPublish(t *testing.T) {
+	t.Parallel()
+	t.Log("Testing Fan Publish")
+	router := startRouter()
+	t.Cleanup(router.StopRouter)
+
+	testRoutes := []string{"route1", "route2", "route3", "route4", "route5"}
+
+	t.Log("creating routes")
+	for _, route := range testRoutes {
+		router.RegisterRoute(route, 2)
+	}
+
+	consumers := make([]*consumer.Consumer, 5)
+
+	t.Log("creating consumers")
+	for i, route := range testRoutes {
+		consumers[i] = router.GetConsumer(route)
+	}
+
+	t.Log("creating publisher")
+	publisher := router.GetPublisher()
+	t.Log("publishing")
+	testMessage := []byte("test message")
+	ids, ok := publisher.FanPublish(testMessage, testRoutes...)
+	if !ok {
+		t.Error("test failed fan publishing returned false")
+		t.FailNow()
+	}
+	if len(ids) != len(testRoutes) {
+		t.Errorf("test failed ids length is different from test routes wanted %v got %v", len(testRoutes), len(ids))
+		t.FailNow()
+	}
+	for i, id := range ids {
+		if id == "" {
+			t.Errorf("test failed message id of index %v is empty", i)
+			t.FailNow()
+		}
+	}
+
+	t.Log("waiting for processing")
+	time.Sleep(time.Millisecond * 500)
+	t.Log("processing results")
+	for i, route := range testRoutes {
+		msg, ok := receiveMessage(consumers[i])
+		if !ok {
+			t.Errorf("test failed getting message for route %v", route)
+			t.FailNow()
+		}
+		if msg.GetId() != ids[i] {
+			t.Errorf("test failed message id differs from published id wanted %v got %v", ids[i], msg.GetId())
+			t.FailNow()
+		}
+		if msg.Content == nil || string(msg.Content) != string(testMessage) {
+			t.Errorf("test failed content mismatch wanted %v got %v", string(testMessage), string(msg.Content))
+			t.FailNow()
+		}
+		consumers[i].Ack(msg)
+	}
+
+}
+
 // Test if an expired message is re-delivered
 // fails if there is an failure in delivering the message
 // fails if there is an failure in retrieving the message
 // fails if initial message IsExpired returns false
-
 func TestReAcquireMessage(t *testing.T) {
 	t.Parallel()
 	// setup

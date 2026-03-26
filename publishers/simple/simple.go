@@ -28,6 +28,22 @@ func (pub *SimplePublisher) Publish(content []byte, RouteKey string) (string, bo
 	}
 }
 
+func (pub *SimplePublisher) FanPublish(content []byte, routes ...string) ([]string, bool) {
+	select {
+	case <-pub.routerStopCTX.Done():
+		return nil, false
+	default:
+		ids := make([]string, len(routes))
+		for i, RouteKey := range routes {
+			routerMessage := Messages.CreateMessage(content, RouteKey)
+			messageId := routerMessage.GetId()
+			ids[i] = messageId
+			pub.outputChan <- routerMessage
+		}
+		return ids, true
+	}
+}
+
 // Starts an publisher receiving the router input channel and the router stop context
 func (pub *SimplePublisher) StartPublisher(output *chan *Messages.RouterMessage, routerStopCTX context.Context) {
 	pub.routerStopCTX = routerStopCTX
