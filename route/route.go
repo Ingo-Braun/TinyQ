@@ -14,10 +14,12 @@ import (
 
 const MessageRetrievalTimeout = 100
 
+var ErrorRouteClosed error = errors.New("error route is closed")
+
 // message storage to awaiting confirmation (Ack) messages
 type MessageStorage struct {
 	ConsumerId string
-	Message    *Messages.RouterMessage
+	Message    *Messages.Message
 }
 
 // Route struct
@@ -25,9 +27,9 @@ type MessageStorage struct {
 // DO NOT CREATE AN ROUTE FROM SCRATCH
 type Route struct {
 	// channel that will hold the messages to deliver
-	Channel chan *Messages.RouterMessage
+	Channel chan *Messages.Message
 	// priority channel to deliver expired messages as "new"
-	reDeliveryChannel chan *Messages.RouterMessage
+	reDeliveryChannel chan *Messages.Message
 	// map of messages awaiting confirmation [messageId]messageStorage struct
 	awaitingMessages map[string]MessageStorage
 	// waiting messages mutex
@@ -44,7 +46,7 @@ type Route struct {
 	ChanSize int
 
 	hookExecutor     *hooks.HookExecutor
-	hookInputChannel chan *Messages.RouterMessage
+	hookInputChannel chan *Messages.Message
 	hooksEnabled     bool
 	hooksEnableMutex sync.Mutex
 }
@@ -75,7 +77,7 @@ func (r *Route) checkIfRouterIsClosed() {
 // Puts the message in the awaiting messages map
 // Unlocks the awaiting messages map
 // Returns message,true
-func (r *Route) GetMessage(consumerId string) (*Messages.RouterMessage, bool) {
+func (r *Route) GetMessage(consumerId string) (*Messages.Message, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*MessageRetrievalTimeout)
 	for {
 
@@ -169,7 +171,7 @@ func (r *Route) Ack(consumerId string, messageId string) bool {
 // This can be used to check if an consumer still is responsible for that message
 // Changes when an expired message get processed by the expired messages routine
 // Changes when an message is retrieved by an consumer
-func (r *Route) GetConsumerId(message *Messages.RouterMessage) (string, bool) {
+func (r *Route) GetConsumerId(message *Messages.Message) (string, bool) {
 	r.awaitingMessagesMutex.Lock()
 	defer r.awaitingMessagesMutex.Unlock()
 	messageStorage, ok := r.awaitingMessages[message.GetId()]
@@ -180,12 +182,12 @@ func (r *Route) GetConsumerId(message *Messages.RouterMessage) (string, bool) {
 }
 
 // Setups the Route and start the expired messages routine
-func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *Messages.RouterMessage) {
-	outputChannel := make(chan *Messages.RouterMessage, channelSize)
+func SetupRoute(routerCloseCTX context.Context, channelSize int) (*Route, chan *Messages.Message) {
+	outputChannel := make(chan *Messages.Message, channelSize)
 	CloseCTX, closeCancel := context.WithCancel(context.Background())
 	route := Route{
 		Channel:           outputChannel,
-		reDeliveryChannel: make(chan *Messages.RouterMessage, channelSize),
+		reDeliveryChannel: make(chan *Messages.Message, channelSize),
 		awaitingMessages:  make(map[string]MessageStorage),
 		CloseCTX:          CloseCTX,
 		CloseCancel:       closeCancel,

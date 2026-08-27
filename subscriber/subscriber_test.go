@@ -16,7 +16,7 @@ func TestCreateSubscriber(t *testing.T) {
 	defer routeCancel()
 	newRoute, _ := route.SetupRoute(routeCtx, 10)
 	returnChannel := make(chan string, 5)
-	callback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+	callback := func(message *messages.Message, ack context.CancelFunc) {
 		returnChannel <- message.GetId()
 		ack()
 	}
@@ -36,7 +36,7 @@ func TestReceiveMessage(t *testing.T) {
 	defer routeCancel()
 	newRoute, routeInputChannel := route.SetupRoute(routeCtx, 10)
 	returnChannel := make(chan string, 5)
-	callback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+	callback := func(message *messages.Message, ack context.CancelFunc) {
 		returnChannel <- message.GetId()
 		ack()
 	}
@@ -77,7 +77,7 @@ func TestFailToAck(t *testing.T) {
 	defer routeCancel()
 	newRoute, routeInputChannel := route.SetupRoute(routeCtx, 10)
 	returnChannel := make(chan string, 5)
-	callback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+	callback := func(message *messages.Message, ack context.CancelFunc) {
 		t.Log("hook executed awaiting for message to expire")
 		time.Sleep(messages.DeliveryTimeout + 1)
 		t.Logf("message is expired %v \n", message.IsExpired())

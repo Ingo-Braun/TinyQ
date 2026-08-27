@@ -9,7 +9,7 @@ import (
 
 type SimplePublisher struct {
 	// Router messages input channel
-	outputChan chan *Messages.RouterMessage
+	outputChan chan *Messages.Message
 	// Router stop context
 	routerStopCTX context.Context
 }
@@ -45,7 +45,7 @@ func (pub *SimplePublisher) FanPublish(content []byte, routes ...string) ([]stri
 }
 
 // Starts an publisher receiving the router input channel and the router stop context
-func (pub *SimplePublisher) StartPublisher(output *chan *Messages.RouterMessage, routerStopCTX context.Context) {
+func (pub *SimplePublisher) StartPublisher(output *chan *Messages.Message, routerStopCTX context.Context) {
 	pub.routerStopCTX = routerStopCTX
 	pub.outputChan = *output
 }

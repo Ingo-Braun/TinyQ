@@ -23,7 +23,7 @@ type Subscriber struct {
 	closeCancel   context.CancelFunc
 }
 
-type CallBack func(*Messages.RouterMessage, context.CancelFunc)
+type CallBack func(*Messages.Message, context.CancelFunc)
 
 func (s *Subscriber) Setup(route *Route.Route, callbackFunc CallBack) {
 	s.id = uuid.New().String()

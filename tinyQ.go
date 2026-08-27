@@ -42,6 +42,8 @@ var ErrorRouteHooksDisabled error = errors.New("error route hooks is disabled")
 // Error throw when attempting to register hooks after router is started
 var ErrorRouterStartedHook error = errors.New("error router is started, hooks cannot be enabled while running")
 
+var ErrorRouteNotFound error = errors.New("error route not found")
+
 // Main router, responsible to route messages into routes
 // call InitRouter to initialize the router
 // call StopRouter to stop the routing process WARNING this kills all routes and deletes all messages on the routes
@@ -51,9 +53,9 @@ type Router struct {
 	// Routing map mutex
 	routesMutex sync.RWMutex
 	// Router input channel - where the messages come
-	RouterInput chan *Messages.RouterMessage
+	RouterInput chan *Messages.Message
 	// Router re-send channel not used
-	ResendChannel chan *Messages.RouterMessage
+	ResendChannel chan *Messages.Message
 	// Router stop context
 	stopCTX       context.Context
 	stopCTXCancel context.CancelFunc
@@ -72,7 +74,7 @@ type Router struct {
 }
 
 // Ad-hoc message deliver delivery`s a message without the need to use an publisher
-func (router *Router) deliverMessage(routerMessage *Messages.RouterMessage, destinationRoute *Route.Route) {
+func (router *Router) deliverMessage(routerMessage *Messages.Message, destinationRoute *Route.Route) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 writeLoop:
@@ -113,7 +115,7 @@ writeLoop:
 // this worker temporary locks the Routes map to deliver the message
 // this will try to deliver the message up to reDeliverCount (5)
 func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
-	var routerMessage *Messages.RouterMessage
+	var routerMessage *Messages.Message
 	for {
 		select {
 		case <-cancelCTX.Done():
@@ -159,7 +161,7 @@ func (router *Router) routerDistributionWorker(cancelCTX context.Context) {
 // NIL pointer exceptions will be raised if not called before use
 func (router *Router) InitRouter() {
 	log.Println("starting router")
-	router.RouterInput = make(chan *Messages.RouterMessage)
+	router.RouterInput = make(chan *Messages.Message)
 	router.Routes = make(map[string]*Route.Route)
 	router.stopCTX, router.stopCTXCancel = context.WithCancel(context.Background())
 	go router.routerDistributionWorker(router.stopCTX)
@@ -239,7 +241,7 @@ func (router *Router) UnregisterRoute(routeKey string) bool {
 // Returns the router input channel as an pointer
 // you should never need this use with caution
 // Warning closing this channel will break things without any chance of recover
-func (router *Router) GetInputChannel() *chan *Messages.RouterMessage {
+func (router *Router) GetInputChannel() *chan *Messages.Message {
 	return &router.RouterInput
 }
 
@@ -476,6 +478,466 @@ func (router *Router) AddMessagePostInHook(routeKey string, hook hooks.Hook) err
 	routerExecutor.HookExecutor.AddHook(hook)
 	if router.odometer {
 		router.telemetryChannel <- Messages.TelemetryPackage{
+			Type:  Messages.TelemetryTypeHookRegister,
+			Value: 1,
+		}
+	}
+	return nil
+}
+
+// Main router, responsible to route messages into routes
+// call InitRouter to initialize the router
+// call StopRouter to stop the routing process WARNING this kills all routes and deletes all messages on the routes
+type Broker struct {
+	// Routing map used to store all known routes [routeKey]*Route
+	Queues map[string]*Route.Route
+	// Routing map mutex
+	queueMutex sync.RWMutex
+	// Router input channel - where the messages come
+	RouterInput chan *Messages.Message
+	// Router re-send channel not used
+	ResendChannel chan *Messages.Message
+	// Router stop context
+	stopCTX       context.Context
+	stopCTXCancel context.CancelFunc
+	// Odometer flag
+	odometer bool
+
+	telemetryMutex   sync.Mutex
+	telemetry        *Telemetry
+	telemetryChannel chan Messages.TelemetryPackage
+	// flag if the router is started, used to prevent dangerous operations after the distribution routine is started
+	isStarted bool
+	// flag if hooks is enabled for this router
+	hooksEnabled        bool
+	hooksExecutors      map[string]*RouterHookExecutor
+	hooksExecutorsMutex sync.Mutex
+}
+
+func (broker *Broker) Publish(routerMessage *Messages.Message, queueKey string) error {
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	if !broker.hasRoute(queueKey) {
+		return ErrorRouteNotFound
+	}
+	if broker.Queues[queueKey].IsClosed() {
+		return Route.ErrorRouteClosed
+	}
+	broker.Queues[queueKey].Channel <- routerMessage
+	return nil
+}
+
+// // Ad-hoc message deliver delivery`s a message without the need to use an publisher
+// func (router *Broker) deliverMessage(routerMessage *Messages.RouterMessage, destinationRoute *Route.Route) {
+// 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
+// 	defer cancel()
+// writeLoop:
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			routerMessage.RetrySend++
+// 			// router.ResendChannel <- routerMessage
+// 			router.RouterInput <- routerMessage
+// 			break writeLoop
+// 		default:
+
+// 			if len(destinationRoute.Channel) < destinationRoute.ChanSize {
+// 				destinationRoute.Channel <- routerMessage
+// 				if router.hooksEnabled {
+// 					router.hooksExecutorsMutex.Lock()
+// 					routeHookExecutor, ok := router.hooksExecutors[routerMessage.Route]
+// 					if ok {
+// 						messageCopy := *routerMessage
+// 						routeHookExecutor.HookInputChannel <- &messageCopy
+// 					}
+// 					router.hooksExecutorsMutex.Unlock()
+// 				}
+// 				if router.odometer {
+// 					router.telemetryChannel <- Messages.TelemetryPackage{
+// 						Type:  Messages.TelemetryTypeMessagesProcessed,
+// 						Value: 1,
+// 					}
+// 				}
+// 				break writeLoop
+// 			}
+// 		}
+// 	}
+// }
+
+// // Broker worker to pass messages from the input channel to destination routes
+// // messages with an invalid destination are discarded
+// // this worker temporary locks the Routes map to deliver the message
+// // this will try to deliver the message up to reDeliverCount (5)
+// func (router *Broker) routerDistributionWorker(cancelCTX context.Context) {
+// 	var routerMessage *Messages.RouterMessage
+// 	for {
+// 		select {
+// 		case <-cancelCTX.Done():
+// 			log.Println("stopping router consumer")
+// 			return
+// 		case routerMessage = <-router.RouterInput:
+// 			if router.odometer {
+// 				router.telemetryChannel <- Messages.TelemetryPackage{
+// 					Type:  Messages.TelemetryTypeMessagesSent,
+// 					Value: 1,
+// 				}
+// 			}
+// 			if routerMessage.RetrySend < reDeliverCount {
+// 				router.routesMutex.RLock()
+// 				destinationRoute, ok := router.getRoute(routerMessage.Route)
+// 				if ok {
+// 					router.deliverMessage(routerMessage, destinationRoute)
+// 					router.routesMutex.RUnlock()
+// 					continue
+// 				}
+// 				router.routesMutex.RUnlock()
+// 				if router.odometer {
+// 					router.telemetryChannel <- Messages.TelemetryPackage{
+// 						Type:  Messages.TelemetryTypeMessagesResent,
+// 						Value: 1,
+// 					}
+// 				}
+// 				log.Printf("discarding message to route %v due not being registered\n", routerMessage.Route)
+// 			}
+// 			if router.odometer {
+// 				router.telemetryChannel <- Messages.TelemetryPackage{
+// 					Type:  Messages.TelemetryTypeMessagesDiscarded,
+// 					Value: 1,
+// 				}
+// 			}
+// 			log.Println("discarding message due to max retries exceeded")
+// 		}
+// 	}
+// }
+
+// Initializes the router and start the router distribution worker
+// Call this BEFORE using anything from the router
+// NIL pointer exceptions will be raised if not called before use
+func (broker *Broker) Init() {
+	// log.Println("starting router")
+	broker.RouterInput = make(chan *Messages.Message)
+	broker.Queues = make(map[string]*Route.Route)
+	broker.stopCTX, broker.stopCTXCancel = context.WithCancel(context.Background())
+	// go router.routerDistributionWorker(router.stopCTX)
+	// router.isStarted = true
+	// log.Println("router started")
+}
+
+// Stops everything
+// distribution worker will be stopped
+// publishers will be stopped
+// consumers will be stopped
+func (broker *Broker) StopRouter() {
+	broker.stopCTXCancel()
+}
+
+// Register a new route
+// Call this BEFORE publishing any message
+// Calling two times on same route key is fine
+func (broker *Broker) RegisterQueue(routeKey string, routeMaxSize int) {
+
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	broker.registerQueue(routeKey, routeMaxSize)
+}
+
+// performs the register route unsafe
+// DO NOT CALL this if routesMutex lock is not acquired
+func (broker *Broker) registerQueue(routeKey string, routeMaxSize int) {
+	if !broker.hasRoute(routeKey) {
+		route, _ := Route.SetupRoute(broker.stopCTX, routeMaxSize)
+		broker.Queues[routeKey] = route
+		if broker.odometer {
+			broker.telemetryChannel <- Messages.TelemetryPackage{
+				Type:  Messages.TelemetryTypeQueueRegister,
+				Value: 1,
+			}
+		}
+	}
+}
+
+// Removes an route
+// This will stop all consumers connected to this route and deletes all messages
+// Calling twice on same route key is fine
+func (broker *Broker) UnregisterQueue(routeKey string) bool {
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	route, ok := broker.Queues[routeKey]
+	if ok {
+		route.CloseRoute()
+		if broker.hooksEnabled {
+			broker.hooksExecutorsMutex.Lock()
+			defer broker.hooksExecutorsMutex.Unlock()
+			executor, ok := broker.hooksExecutors[routeKey]
+			if ok {
+				executor.HookExecutor.Stop()
+			}
+			delete(broker.hooksExecutors, routeKey)
+			if broker.odometer {
+				broker.telemetryChannel <- Messages.TelemetryPackage{
+					Type:  Messages.TelemetryTypeHookUnregister,
+					Value: 1,
+				}
+			}
+		}
+		delete(broker.Queues, routeKey)
+		if broker.odometer {
+			broker.telemetryChannel <- Messages.TelemetryPackage{
+				Type:  Messages.TelemetryTypeQueueUnregister,
+				Value: 1,
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// Returns the router input channel as an pointer
+// you should never need this use with caution
+// Warning closing this channel will break things without any chance of recover
+// func (router *Broker) GetInputChannel() *chan *Messages.Message {
+// 	return &router.RouterInput
+// }
+
+// Creates and returns a new consumer to an route key
+// if an route does not exist creates one with DefaultMaxChanSize and hooks DISABLED
+// Every consumer is thread safe
+// use as many as you need
+func (broker *Broker) GetConsumer(routeKey string) *consumer.Consumer {
+	consumer := consumer.Consumer{}
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	if !broker.hasRoute(routeKey) {
+		broker.registerQueue(routeKey, DefaultMaxRouteSize)
+	}
+	route, ok := broker.getQueue(routeKey)
+	if ok {
+		consumer.Setup(route)
+		return &consumer
+	}
+	return nil
+}
+
+// Return an pinter to the Route object used by the router to receive messages from the main input
+// Use with caution
+func (broker *Broker) GetQueue(routeKey string) (*Route.Route, bool) {
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	route, ok := broker.getQueue(routeKey)
+	return route, ok
+}
+
+// performs the get route unsafe
+// DO NOT CALL this if routesMutex lock is not acquired
+func (broker *Broker) getQueue(routeKey string) (*Route.Route, bool) {
+	route, ok := broker.Queues[routeKey]
+	return route, ok
+}
+
+// Creates and return a new publisher linked to this router
+// Every message published goes to the router input channel for distribution
+// Every publisher is thread safe
+// Use as many as you need
+func (broker *Broker) GetPublisher(queueKey string) (*SimplePublisher.SimplePublisher, error) {
+	publisher := SimplePublisher.SimplePublisher{}
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	if !broker.hasRoute(queueKey) {
+		return nil, ErrorRouteNotFound
+	}
+	queue, _ := broker.Queues[queueKey]
+	publisher.StartPublisher(&queue.Channel, broker.stopCTX)
+	return &publisher, nil
+}
+
+// Creates and return a new publisher linked to an specific route
+// Every message published goes to the router input channel for distribution
+// Every dedicated publisher is thread safe
+// Use as many as you need
+// returns nil if failed to get the route with the routing key
+func (router *Broker) GetDedicatedPublisher(routeKey string) *DedicatedPublisher.DedicatedPublisher {
+	router.queueMutex.Lock()
+	defer router.queueMutex.Unlock()
+	if router.hasRoute(routeKey) {
+		publisher := DedicatedPublisher.DedicatedPublisher{}
+		route, ok := router.getQueue(routeKey)
+		if !ok {
+			return nil
+		}
+		publisher.StartPublisher(routeKey, route, router.stopCTX)
+		return &publisher
+	}
+	return nil
+}
+
+// Checks if the router has an route with that route key
+// This locks the Routes map to get the answer
+func (broker *Broker) HasRoute(routeKey string) bool {
+	broker.queueMutex.RLock()
+	ok := broker.hasRoute(routeKey)
+	broker.queueMutex.RUnlock()
+	return ok
+}
+
+// performs the has route check unsafe
+// DO NOT CALL this if routesMutex lock is not acquired
+func (broker *Broker) hasRoute(routeKey string) bool {
+
+	_, ok := broker.Queues[routeKey]
+	return ok
+}
+
+// Checks if the broker is running
+func (broker *Broker) IsRunning() bool {
+	return !errors.Is(broker.stopCTX.Err(), context.Canceled)
+}
+
+// return a new Subscriber linked to a route
+// routeKey registered route key
+// callBack function of type Subscriber.CallBack
+// returns *Subscriber.Subscriber or nil on error
+// returns true if subscriber is correctly created
+// returns false in case of route key not found
+func (broker *Broker) GetSubscriber(routeKey string, callBack Subscriber.CallBack) (*Subscriber.Subscriber, bool) {
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	if broker.hasRoute(routeKey) {
+		subscriber := Subscriber.Subscriber{}
+		route, ok := broker.getQueue(routeKey)
+		if !ok {
+			return nil, false
+		}
+		subscriber.Setup(route, callBack)
+		return &subscriber, true
+	}
+	return nil, false
+}
+
+// return an Telemetry object with the data collected from the router
+// Warning this function data is an snapshot of data
+func (broker *Broker) GetTelemetry() Telemetry {
+	broker.telemetryMutex.Lock()
+	telemetryCopy := Telemetry{
+		TotalMessages:         broker.telemetry.TotalMessages,
+		TotalDelivered:        broker.telemetry.TotalDelivered,
+		TotalLost:             broker.telemetry.TotalLost,
+		TotalReDelivered:      broker.telemetry.TotalReDelivered,
+		TotalQueuesRegistered: broker.telemetry.TotalQueuesRegistered,
+	}
+	broker.telemetryMutex.Unlock()
+	return telemetryCopy
+}
+
+// telemetry routine to receive telemetry information from the distribution routine
+func (broker *Broker) telemetryProcessor() {
+	for {
+		select {
+		case <-broker.stopCTX.Done():
+			return
+		case telemetryMessage := <-broker.telemetryChannel:
+			broker.telemetryMutex.Lock()
+			broker.telemetry.UpdateTelemetry(telemetryMessage)
+			broker.telemetryMutex.Unlock()
+
+		}
+
+	}
+}
+
+// enables telemetry data collection
+// for more information on what values are generated see Telemetry struct
+func (broker *Broker) EnableTelemetry() {
+	broker.odometer = true
+	broker.telemetry = GetNewTelemetry()
+	broker.telemetryChannel = make(chan Messages.TelemetryPackage, DefaultTelemetryChanSize)
+	broker.queueMutex.Lock()
+	broker.telemetryChannel <- Messages.TelemetryPackage{
+		Type:  Messages.TelemetryTypeQueueUpdate,
+		Value: len(broker.Queues),
+	}
+	broker.queueMutex.Unlock()
+	go broker.telemetryProcessor()
+}
+
+// stops an specific route
+// WARNING this will cascade to all consumers and subscribers linked to this route
+func (broker *Broker) StopRoute(routeKey string) bool {
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	route, ok := broker.getQueue(routeKey)
+	if !ok {
+		return false
+	}
+	route.CloseRoute()
+	if broker.hooksEnabled {
+		broker.hooksExecutorsMutex.Lock()
+		defer broker.hooksExecutorsMutex.Unlock()
+		executor, ok := broker.hooksExecutors[routeKey]
+		if ok {
+			executor.HookExecutor.Stop()
+		}
+		delete(broker.hooksExecutors, routeKey)
+	}
+	return true
+}
+
+// enables hooks
+// can only be called when router.InitRouter has been not called yet
+// returns ErrorRouterStartedHook when called after router start
+func (broker *Broker) EnableHooks() error {
+	if broker.isStarted {
+		return ErrorRouterStartedHook
+	}
+	broker.hooksEnabled = true
+	broker.hooksExecutors = make(map[string]*RouterHookExecutor)
+	return nil
+}
+
+// returns if hooks are enabled
+func (broker *Broker) IsHooksEnabled() bool {
+	return broker.hooksEnabled
+}
+
+// add hook to run after an message is acknowledged
+// enables hooks in route if hooks are enabled on the router
+// returns ErrorRouteToHookNotFound if an route is not found with the specified route key
+func (broker *Broker) AddPostAckHook(routeKey string, hook hooks.Hook) error {
+	if !broker.hooksEnabled {
+		return ErrorRouteHooksDisabled
+	}
+	broker.queueMutex.Lock()
+	defer broker.queueMutex.Unlock()
+	route, ok := broker.getQueue(routeKey)
+	if ok {
+		err := route.AddHook(hook)
+		return err
+
+	} else {
+		return ErrorRouteToHookNotFound
+	}
+
+}
+
+func (broker *Broker) AddMessagePostInHook(routeKey string, hook hooks.Hook) error {
+	broker.queueMutex.Lock()
+	if !broker.hasRoute(routeKey) {
+		broker.queueMutex.Unlock()
+		return ErrorRouteToHookNotFound
+	}
+	broker.queueMutex.Unlock()
+	broker.hooksExecutorsMutex.Lock()
+	defer broker.hooksExecutorsMutex.Unlock()
+	routerExecutor, ok := broker.hooksExecutors[routeKey]
+	if !ok {
+		routerExecutor = &RouterHookExecutor{}
+		routerExecutor.HookExecutor = hooks.CreateHookExecutor(true)
+		routerExecutor.HookInputChannel = routerExecutor.HookExecutor.GetInputChannel()
+		routerExecutor.HookExecutor.StartExecutor()
+		broker.hooksExecutors[routeKey] = routerExecutor
+	}
+	routerExecutor.HookExecutor.AddHook(hook)
+	if broker.odometer {
+		broker.telemetryChannel <- Messages.TelemetryPackage{
 			Type:  Messages.TelemetryTypeHookRegister,
 			Value: 1,
 		}

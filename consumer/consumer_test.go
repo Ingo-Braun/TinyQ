@@ -10,7 +10,7 @@ import (
 	"github.com/Ingo-Braun/TinyQ/route"
 )
 
-func createConsumer(ctx context.Context) (*consumer.Consumer, *route.Route, chan *messages.RouterMessage) {
+func createConsumer(ctx context.Context) (*consumer.Consumer, *route.Route, chan *messages.Message) {
 	newRoute, routeChannel := route.SetupRoute(ctx, 10)
 	newConsumer := consumer.Consumer{}
 	newConsumer.Setup(newRoute)

@@ -24,7 +24,7 @@ func startRouter() *tinyQ.Router {
 
 // helper function to get messages from a consumer
 // consumer should timeout before
-func receiveMessage(consumer *consumer.Consumer) (*messages.RouterMessage, bool) {
+func receiveMessage(consumer *consumer.Consumer) (*messages.Message, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*2000)
 	for {
 		select {
@@ -518,7 +518,7 @@ func TestAcquireExpiredMessageByOtherConsumer(t *testing.T) {
 		t.FailNow()
 	}
 	// retrieve expired message as new using consumer 2
-	var message2 *messages.RouterMessage
+	var message2 *messages.Message
 	message2, ok = receiveMessage(consumer2)
 	if !ok {
 		t.FailNow()
@@ -843,7 +843,7 @@ func TestSubscriber(t *testing.T) {
 	messageIdChan <- messageId
 
 	// callback function in compliance to subscriber.CallBack (*messages.RouterMessage,contextCancelFunc)
-	testCallback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+	testCallback := func(message *messages.Message, ack context.CancelFunc) {
 		id := <-messageIdChan
 		// log.Printf("want %v got %v", id, message.GetId())
 		// log.Print(id != message.GetId())
@@ -1003,7 +1003,7 @@ func TestClosingRouter(t *testing.T) {
 
 	consumer1 := router.GetConsumer("test1")
 
-	testCallback := func(message *messages.RouterMessage, ack context.CancelFunc) {
+	testCallback := func(message *messages.Message, ack context.CancelFunc) {
 		ack()
 	}
 
@@ -1118,11 +1118,11 @@ func TestPostAckHook(t *testing.T) {
 	router.InitRouter()
 	t.Log("router start")
 	// message return channel
-	hookReturnChannel := make(chan *messages.RouterMessage, 1)
+	hookReturnChannel := make(chan *messages.Message, 1)
 	var hook1 hooks.Hook
 	testRouteKey := "testRoute"
 
-	hook1 = func(message *messages.RouterMessage) error {
+	hook1 = func(message *messages.Message) error {
 		hookReturnChannel <- message
 		return nil
 	}
@@ -1171,7 +1171,7 @@ func TestPostAckHookUnregisteredRoute(t *testing.T) {
 	router.EnableHooks()
 	router.InitRouter()
 	defer router.StopRouter()
-	hook := func(message *messages.RouterMessage) error {
+	hook := func(message *messages.Message) error {
 		t.Log("executing hook")
 		return nil
 	}
@@ -1194,10 +1194,10 @@ func TestPrePostHook(t *testing.T) {
 	router.EnableHooks()
 	router.InitRouter()
 	t.Log("router start")
-	hookReturnChannel := make(chan *messages.RouterMessage, 1)
+	hookReturnChannel := make(chan *messages.Message, 1)
 	var hook1 hooks.Hook
 	testRouteKey := "testRoute"
-	hook1 = func(message *messages.RouterMessage) error {
+	hook1 = func(message *messages.Message) error {
 		t.Log("executing hook")
 		hookReturnChannel <- message
 		return nil
@@ -1238,7 +1238,7 @@ func TestPrePostHookUnregisteredRoute(t *testing.T) {
 	router.EnableHooks()
 	router.InitRouter()
 	defer router.StopRouter()
-	hook := func(message *messages.RouterMessage) error {
+	hook := func(message *messages.Message) error {
 		t.Log("executing hook")
 		return nil
 	}

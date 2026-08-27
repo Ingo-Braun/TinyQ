@@ -30,7 +30,7 @@ type Consumer struct {
 // returns an message and an ok
 // if the retrieval operation times out returns nil,false
 // if the route is closed returns nil,false
-func (c *Consumer) GetMessage() (*Messages.RouterMessage, bool) {
+func (c *Consumer) GetMessage() (*Messages.Message, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*MessageRetrievalTimeout)
 	defer cancel()
 	for {
@@ -68,7 +68,7 @@ func (c *Consumer) Size() int {
 // Confirm receiving an message
 // You can only confirm an message from the same consumer
 // This stops the message delivery timer
-func (c *Consumer) Ack(message *Messages.RouterMessage) bool {
+func (c *Consumer) Ack(message *Messages.Message) bool {
 	return c.route.Ack(c.GetId(), message.GetId())
 }
 

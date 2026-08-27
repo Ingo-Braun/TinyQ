@@ -12,7 +12,7 @@ import (
 func TestPublish(t *testing.T) {
 	t.Parallel()
 	publisher := simple.SimplePublisher{}
-	inputChannel := make(chan *messages.RouterMessage, 10)
+	inputChannel := make(chan *messages.Message, 10)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	publisher.StartPublisher(&inputChannel, ctx)
@@ -44,7 +44,7 @@ func TestPublish(t *testing.T) {
 func TestPublishWithClosedPublisher(t *testing.T) {
 	t.Parallel()
 	publisher := simple.SimplePublisher{}
-	inputChannel := make(chan *messages.RouterMessage)
+	inputChannel := make(chan *messages.Message)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	publisher.StartPublisher(&inputChannel, ctx)

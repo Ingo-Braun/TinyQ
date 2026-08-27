@@ -11,7 +11,7 @@ import (
 
 // creates a new Route using context
 // used as shortcut for tests
-func createTestRoute(ctx context.Context) (*route.Route, chan *messages.RouterMessage) {
+func createTestRoute(ctx context.Context) (*route.Route, chan *messages.Message) {
 
 	newRoute, routeChannel := route.SetupRoute(ctx, 10)
 	return newRoute, routeChannel
@@ -279,7 +279,7 @@ func TestAddHook(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	newRoute, _ := createTestRoute(ctx)
-	hook1 := func(message *messages.RouterMessage) error {
+	hook1 := func(message *messages.Message) error {
 		return nil
 	}
 	err := newRoute.AddHook(hook1)
@@ -297,7 +297,7 @@ func TestHookCount(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	newRoute, _ := createTestRoute(ctx)
-	hook1 := func(message *messages.RouterMessage) error {
+	hook1 := func(message *messages.Message) error {
 		return nil
 	}
 	err := newRoute.AddHook(hook1)
@@ -324,7 +324,7 @@ func TestHookExecution(t *testing.T) {
 	defer cancel()
 	newRoute, routeInputChannel := createTestRoute(ctx)
 	hookReturnChannel := make(chan string, 1)
-	hook1 := func(message *messages.RouterMessage) error {
+	hook1 := func(message *messages.Message) error {
 		hookReturnChannel <- message.GetId()
 		return nil
 	}

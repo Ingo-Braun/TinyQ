@@ -23,14 +23,14 @@ var ErrorRoutineModeDisabled error = errors.New("routine mode is disabled error"
 // error raised when executing an hook returns an error
 var ErrorExecutingHooks error = errors.New("failed executing hooks")
 
-type Hook func(message *Messages.RouterMessage) error
-type HookChannel chan *Messages.RouterMessage
+type Hook func(message *Messages.Message) error
+type HookChannel chan *Messages.Message
 
 type HookExecutor struct {
 	hooks                []Hook
 	hooksCount           int
 	hooksFailed          int64
-	inputChannel         chan *Messages.RouterMessage
+	inputChannel         chan *Messages.Message
 	hooksMutex           sync.Mutex
 	routineMode          bool
 	executorContext      context.Context
@@ -40,7 +40,7 @@ type HookExecutor struct {
 // creates new hook executor
 func CreateHookExecutor(routineMode bool) *HookExecutor {
 	executor := HookExecutor{
-		inputChannel: make(chan *Messages.RouterMessage, 10),
+		inputChannel: make(chan *Messages.Message, 10),
 		routineMode:  routineMode,
 	}
 	return &executor
@@ -106,13 +106,13 @@ func (hookExecutor *HookExecutor) executor() {
 }
 
 // returns the messages input channel witch is used by the hook executor
-func (hookExecutor *HookExecutor) GetInputChannel() chan *Messages.RouterMessage {
+func (hookExecutor *HookExecutor) GetInputChannel() chan *Messages.Message {
 	return hookExecutor.inputChannel
 }
 
 // hooks queue executor
 // executes all queue with passed message
-func (hookExecutor *HookExecutor) Execute(message *Messages.RouterMessage) (*Hook, error) {
+func (hookExecutor *HookExecutor) Execute(message *Messages.Message) (*Hook, error) {
 	hookExecutor.hooksMutex.Lock()
 	defer hookExecutor.hooksMutex.Unlock()
 	for hookIndex := range hookExecutor.hooks {
